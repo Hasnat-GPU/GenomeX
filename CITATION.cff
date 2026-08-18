@@ -3,8 +3,8 @@ title: "GenomeX: unified genome QC — completeness, contamination, and comparat
 message: "If you use this software, please cite it together with the underlying tools."
 type: software
 authors:
-  - alias: Hasnat-GPU
-    name-particle: ""
+  - given-names: Hasnat
+    alias: Hasnat-GPU
 repository-code: "https://github.com/Hasnat-GPU/GenomeX"
 abstract: >-
   GenomeX runs Prodigal, HMMER against BUSCO OrthoDB v10 profiles, MMseqs2 and
