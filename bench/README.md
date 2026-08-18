@@ -32,3 +32,28 @@ measured on the sequence envelope rather than the HMM profile. Both are fixed;
 the benchmark is what found them.
 
 BUSCO output (`busco_out/`) is not committed; it is regenerable and large.
+
+## GenomeX vs CheckM2
+
+Completeness now has a reference check; contamination does not. CheckM2 provides
+one, over a whole collection rather than four genomes.
+
+```bash
+micromamba create -y -n checkm2 -c conda-forge -c bioconda checkm2
+micromamba run -n checkm2 checkm2 database --download --path ~/genomex-work/db/checkm2
+micromamba run -n checkm2 checkm2 predict --threads 8     --input ~/genomex-work/data/Bacteria --extension .fna     --output-directory ~/genomex-work/checkm2_out
+
+python -m genomex qc ~/genomex-work/data/Bacteria/*.fna --outdir ~/genomex-work/runs/sweep
+python bench/compare_to_checkm2.py     --genomex  ~/genomex-work/runs/sweep     --checkm2  ~/genomex-work/checkm2_out/quality_report.tsv     --out      docs/benchmark-contamination.md
+```
+
+The database download is about 2.9 GB.
+
+This comparison deliberately separates two things. Genome size, contig count,
+GC, N50 and CDS count are computed from the same FASTA by both tools and **must**
+agree -- a gap there is a bug in GenomeX, and it is the only independent check on
+`fasta.py` and `genes.py` in the repository. Completeness and contamination are
+estimates from different methods on different bases; they should track each
+other, and exact equality would be suspicious rather than reassuring.
+
+Results: [`docs/benchmark-contamination.md`](../docs/benchmark-contamination.md).
