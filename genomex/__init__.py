@@ -10,4 +10,4 @@ Modules map one-to-one onto the whiteboard workflow:
     report         JSON + standalone HTML
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
