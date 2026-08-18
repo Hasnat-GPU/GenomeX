@@ -6,6 +6,30 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Marker duplication was overcounted, which propagated into contamination
+  verdicts.** Benchmarking against BUSCO 5.8.3 showed GenomeX calling markers
+  *Duplicated* that BUSCO called *Complete* — 9 of 124 in one genome even when
+  both tools scored identical proteins. Two causes:
+  - BUSCO retains only matches within 85% of a marker's best hit; GenomeX
+    counted every hit above the score cutoff. One marker had a hit at 296.8 and
+    six between 17 and 30, all counted as copies.
+  - Completeness must be measured on the HMM profile axis, not the sequence
+    envelope, which can extend well past the modelled region.
+
+  Duplication rates on the demo set fell from 7–10% to 0–1.6%, and three of four
+  genomes moved from *possible contamination* to *clean*. Agreement with BUSCO is
+  now 496/496 markers in both `-m genome` and `-m proteins` mode.
+
+### Added
+
+- `bench/` — a reproducible BUSCO comparison: `run_busco.sh` runs BUSCO in both
+  modes over the same local lineage, `compare_to_busco.py` diffs the calls marker
+  by marker and writes `docs/benchmark-busco.md`. Its parsers are tested.
+- `genomes/<name>/markers.tsv` — per-marker class, protein and contig, so
+  disagreement can be located rather than merely totalled.
+
 ## [0.1.0] - 2026-08-18
 
 First working version: assemblies in, an evidence-linked report out.

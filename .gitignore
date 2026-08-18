@@ -50,3 +50,4 @@ BioInformaticsX.*
 # BUSCO benchmark output: regenerable, large
 bench/busco_out/
 bench/*.log
+busco_downloads/

@@ -153,22 +153,64 @@ class MarkerResult:
         }
 
 
-def _union_length(intervals: list[tuple[int, int]]) -> int:
-    """Total aa covered by a set of (from, to) domain envelopes, overlaps merged."""
-    if not intervals:
-        return 0
-    merged: list[list[int]] = []
-    for lo, hi in sorted(intervals):
-        if merged and lo <= merged[-1][1] + 1:
-            merged[-1][1] = max(merged[-1][1], hi)
+#: BUSCO keeps only matches scoring within this fraction of a marker's best hit.
+#: Without it, every weak hit above a permissive score cutoff counts as another
+#: copy and the duplication rate -- which the contamination module consumes --
+#: is badly inflated. (BUSCO 5 hmmer.py, _remove_low_scoring_matches.)
+BITSCORE_RETENTION = 0.85
+
+
+def sum_hmm_len(intervals: list[tuple[int, int]]) -> int:
+    """Profile positions covered by a set of (hmm_from, hmm_to) domain coordinates.
+
+    Measured on the *HMM* axis, not the sequence envelope: how much of the
+    profile the protein covers is what the length cutoffs are calibrated against,
+    and an envelope can extend well past the modelled region.
+
+    The merge follows BUSCO's own implementation, which absorbs a region only
+    when its start falls inside an existing one -- deliberately reproduced,
+    including its quirks, so the two tools count the same way.
+    """
+    used: list[list[int]] = []
+    for region in sorted(intervals, key=lambda x: x[0]):
+        for u in used:
+            if u[0] <= region[0] <= u[1]:
+                if region[1] > u[1]:
+                    u[1] = region[1]
+                break
         else:
-            merged.append([lo, hi])
-    return sum(hi - lo + 1 for lo, hi in merged)
+            used.append(list(region))
+    return sum(hi - lo + 1 for lo, hi in used)
 
 
-def parse_domtbl(path: str | Path, lineage: Lineage, gene_contig: dict[str, str]) -> MarkerResult:
-    """Apply BUSCO's score and length cutoffs to a HMMER --domtblout table."""
-    # (busco_id, protein_id) -> (full_sequence_score, [(env_from, env_to), ...])
+def _union_length(intervals: list[tuple[int, int]]) -> int:
+    """Deprecated alias for :func:`sum_hmm_len`."""
+    return sum_hmm_len(intervals)
+
+
+def parse_domtbl(
+    path: str | Path,
+    lineage: Lineage,
+    gene_contig: dict[str, str],
+    *,
+    bitscore_retention: float = BITSCORE_RETENTION,
+) -> MarkerResult:
+    """Apply BUSCO's score, length and bitscore-retention rules to a domtblout table.
+
+    Three steps, in BUSCO's order:
+
+    1. drop hits below the marker's score cutoff;
+    2. classify each surviving hit complete or fragmented from its HMM-profile
+       coverage against the marker's length cutoff (BUSCO's odb10 rule is
+       ``zeta = (length - size) / sigma``, fragmented when ``zeta > 2``);
+    3. per marker, drop hits scoring below ``bitscore_retention`` of that
+       marker's best hit -- only then count copies.
+
+    Step 3 is what separates a genuine second copy from a distant paralog that
+    happened to clear a permissive cutoff. Without it a marker whose best hit
+    scores 297 also counts hits at 17 and 19 as copies.
+    """
+    # (busco_id, protein_id) -> (full_sequence_score, [(hmm_from, hmm_to), ...])
     acc: dict[tuple[str, str], tuple[float, list[tuple[int, int]]]] = {}
     with open(path, "r", encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -179,21 +221,22 @@ def parse_domtbl(path: str | Path, lineage: Lineage, gene_contig: dict[str, str]
                 continue
             protein_id, busco_id = f[0], f[3]
             full_score = float(f[7])
-            env_from, env_to = int(f[19]), int(f[20])
+            hmm_from, hmm_to = int(f[15]), int(f[16])
             key = (busco_id, protein_id)
             if key not in acc:
                 acc[key] = (full_score, [])
-            acc[key][1].append((env_from, env_to))
+            acc[key][1].append((hmm_from, hmm_to))
 
-    hits: list[MarkerHit] = []
-    for (busco_id, protein_id), (full_score, envs) in acc.items():
+    scored: list[MarkerHit] = []
+    for (busco_id, protein_id), (full_score, coords) in acc.items():
         cutoff = lineage.scores.get(busco_id)
         if cutoff is None or full_score < cutoff:
             continue
         sigma, mean_len = lineage.lengths.get(busco_id, (1.0, 0.0))
-        matched = _union_length(envs)
-        status = "complete" if matched > (mean_len - 2 * sigma) else "fragmented"
-        hits.append(
+        matched = sum_hmm_len(coords)
+        zeta = (mean_len - matched) / sigma if sigma else 0.0
+        status = "fragmented" if zeta > 2 else "complete"
+        scored.append(
             MarkerHit(
                 busco_id=busco_id,
                 protein_id=protein_id,
@@ -203,6 +246,12 @@ def parse_domtbl(path: str | Path, lineage: Lineage, gene_contig: dict[str, str]
                 status=status,
             )
         )
+
+    # Retain only matches within `bitscore_retention` of each marker's best hit.
+    best: dict[str, float] = {}
+    for h in scored:
+        best[h.busco_id] = max(best.get(h.busco_id, 0.0), h.score)
+    hits = [h for h in scored if h.score >= bitscore_retention * best[h.busco_id]]
 
     by_marker: dict[str, list[MarkerHit]] = defaultdict(list)
     for h in hits:

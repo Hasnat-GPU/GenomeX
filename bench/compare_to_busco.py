@@ -127,11 +127,12 @@ def _headline_rows(
             f"{gs.get('duplicated', '-')} | {gs.get('fragmented', '-')} | {gs.get('missing', '-')} | "
             f"{gs.get('completeness_percent', '-')}% |"
         )
-        c = bs.get("Complete")
-        pct = f"{100.0 * c / n:.2f}%" if isinstance(c, (int, float)) else "-"
+        c = bs.get("Complete BUSCOs")
+        pct = f"{bs.get('Complete percentage')}%" if c is not None else "-"
         lines.append(
-            f"| {g} | BUSCO ({label}) | {c} | {bs.get('Single copy')} | {bs.get('Multi copy')} | "
-            f"{bs.get('Fragmented')} | {bs.get('Missing')} | {pct} |"
+            f"| {g} | BUSCO ({label}) | {c} | {bs.get('Single copy BUSCOs')} | "
+            f"{bs.get('Multi copy BUSCOs')} | {bs.get('Fragmented BUSCOs')} | "
+            f"{bs.get('Missing BUSCOs')} | {pct} |"
         )
     return lines
 
@@ -155,6 +156,15 @@ def compare_mode(
     lines.append("### Headline numbers")
     lines.append("")
     lines.extend(_headline_rows(genomes, gx_sum, bu_sum, label))
+    lines.append("")
+    lines.append("Side by side, in BUSCO's own summary notation:")
+    lines.append("")
+    lines.append("| genome | GenomeX | BUSCO |")
+    lines.append("|---|---|---|")
+    for g in genomes:
+        gx_str = gx_sum.get(g, {}).get("busco_style_string", "-")
+        bu_str = bu_sum.get(g, {}).get("one_line_summary", "-")
+        lines.append(f"| {g} | `{gx_str}` | `{bu_str}` |")
     lines.append("")
 
     total_pairs: Counter = Counter()

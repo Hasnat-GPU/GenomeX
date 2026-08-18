@@ -4,7 +4,7 @@ The domtblout rows here are hand-built so the expected answer is known exactly:
 which markers are single, duplicated, fragmented, and missing.
 """
 
-from genomex.markers import Lineage, MarkerResult, _union_length, parse_domtbl
+from genomex.markers import Lineage, MarkerResult, parse_domtbl, sum_hmm_len
 
 # Two markers. m1 expects a 100 aa protein (sigma 5 -> complete above 90 aa),
 # m2 expects 200 aa (sigma 10 -> complete above 180 aa).
@@ -17,12 +17,15 @@ LINEAGE = Lineage(
 )
 
 
-def _row(protein: str, busco: str, score: float, env_from: int, env_to: int) -> str:
+def _row(protein: str, busco: str, score: float, hmm_from: int, hmm_to: int) -> str:
+    """One domtblout row. Coordinates are HMM-profile coords, which is what
+    BUSCO measures coverage on -- fields 16 and 17, not the sequence envelope."""
     f = ["-"] * 23
     f[0], f[3] = protein, busco
     f[2], f[5] = "300", "300"
     f[7] = str(score)
-    f[19], f[20] = str(env_from), str(env_to)
+    f[15], f[16] = str(hmm_from), str(hmm_to)
+    f[19], f[20] = str(hmm_from), str(hmm_to)
     return " ".join(f)
 
 
@@ -32,10 +35,10 @@ def _write(tmp_path, rows):
     return p
 
 
-def test_union_length_merges_overlapping_domains():
-    assert _union_length([(1, 50), (40, 80)]) == 80
-    assert _union_length([(1, 50), (60, 80)]) == 71
-    assert _union_length([]) == 0
+def test_hmm_coverage_merges_overlapping_domains():
+    assert sum_hmm_len([(1, 50), (40, 80)]) == 80
+    assert sum_hmm_len([(1, 50), (60, 80)]) == 71
+    assert sum_hmm_len([]) == 0
 
 
 def test_single_copy_marker(tmp_path):
@@ -75,7 +78,8 @@ def test_hit_below_score_cutoff_is_ignored(tmp_path):
 
 
 def test_multiple_domains_of_one_protein_sum_toward_completeness(tmp_path):
-    # Two domains, 1-60 and 55-100: union is 100 aa, above the 90 aa threshold.
+    # Two domains covering profile positions 1-60 and 55-100: 100 covered,
+    # above the 90 position threshold.
     p = _write(
         tmp_path,
         [_row("c1_4", "m1", 120.0, 1, 60), _row("c1_4", "m1", 120.0, 55, 100)],
@@ -140,3 +144,62 @@ def test_marker_table_records_missing_markers_too(tmp_path):
     missing = [r for r in rows if r.split("\t")[1] == "Missing"]
     assert len(missing) == 2
     assert all(r.split("\t")[2] == "-" for r in missing)
+
+
+def test_weak_paralog_hits_do_not_count_as_copies(tmp_path):
+    """A hit far below the marker's best score is a distant paralog, not a copy.
+
+    Real case from Paraburkholderia: marker 1074831at2 had one hit at 296.8 and
+    six between 17 and 30, all above a permissive score cutoff. Counting them as
+    copies reported the marker duplicated and inflated the genome's duplication
+    rate -- the number the contamination module then consumes.
+    """
+    rows = [_row("c1_1", "m1", 296.8, 1, 99)]
+    rows += [
+        _row(f"c1_{i + 2}", "m1", score, 1, 99)
+        for i, score in enumerate([29.7, 24.1, 20.9, 19.7, 19.0, 17.4])
+    ]
+    res = parse_domtbl(_write(tmp_path, rows), LINEAGE, {})
+
+    assert res.single == ["m1"], "one strong hit plus weak paralogs is a single copy"
+    assert res.duplicated == []
+    assert len(res.hits) == 1
+
+
+def test_a_genuine_second_copy_still_counts(tmp_path):
+    """The retention rule must not erase real duplication -- the contamination signal."""
+    rows = [_row("c1_1", "m1", 300.0, 1, 99), _row("c9_4", "m1", 291.0, 1, 99)]
+    res = parse_domtbl(_write(tmp_path, rows), LINEAGE, {"c1_1": "c1", "c9_4": "c9"})
+
+    assert res.duplicated == ["m1"]
+    assert sorted(res.duplicated_marker_contigs()["m1"]) == ["c1", "c9"]
+
+
+def test_retention_threshold_boundary(tmp_path):
+    """Exactly 85% of the best score is retained; just below it is not."""
+    kept = parse_domtbl(
+        _write(tmp_path, [_row("c1_1", "m1", 100.0, 1, 99), _row("c2_1", "m1", 85.0, 1, 99)]),
+        LINEAGE, {},
+    )
+    dropped = parse_domtbl(
+        _write(tmp_path, [_row("c1_1", "m1", 100.0, 1, 99), _row("c2_1", "m1", 84.9, 1, 99)]),
+        LINEAGE, {},
+    )
+    assert kept.duplicated == ["m1"]
+    assert dropped.single == ["m1"]
+
+
+def test_hmm_coverage_not_sequence_envelope_decides_completeness(tmp_path):
+    """A wide envelope over a short profile match must not read as complete.
+
+    m2 expects 200 profile positions with sigma 10, so complete needs >= 180.
+    This hit covers 120 profile positions inside a 400-residue envelope.
+    """
+    f = ["-"] * 23
+    f[0], f[3] = "c1_9", "m2"
+    f[7] = "300.0"
+    f[15], f[16] = "1", "120"      # HMM coords: 120 positions
+    f[19], f[20] = "1", "400"      # envelope: much wider
+    res = parse_domtbl(_write(tmp_path, [" ".join(f)]), LINEAGE, {})
+    assert res.fragmented == ["m2"]
+    assert res.hits[0].matched_aa == 120

@@ -98,16 +98,44 @@ the demo data:
 Between genera, "islands" are an artefact of two thirds of the genes being unique.
 The report says so instead of reporting 253 acquisition islands.
 
+## Validated against BUSCO
+
+GenomeX agrees with BUSCO 5.8.3 on **496 of 496 markers** across the four demo
+genomes, in both BUSCO modes — scoring its own gene predictions and scoring
+GenomeX's. Same lineage directory, same HMMER and Prodigal builds, so nothing in
+that number comes from version drift.
+
+| genome | GenomeX | BUSCO |
+|---|---|---|
+| *C. taiwanensis* | `C:99.19%[S:97.58%,D:1.61%],F:0.81%,M:0.0%` | `C:99.2%[S:97.6%,D:1.6%],F:0.8%,M:0.0%` |
+| *P. phenoliruptrix* BR3459a | `C:100.0%[S:98.39%,D:1.61%],F:0.0%,M:0.0%` | `C:100.0%[S:98.4%,D:1.6%],F:0.0%,M:0.0%` |
+| *P. phymatum* STM815 | `C:100.0%[S:100.0%,D:0.0%],F:0.0%,M:0.0%` | `C:100.0%[S:100.0%,D:0.0%],F:0.0%,M:0.0%` |
+
+It did not start there. The first benchmark showed GenomeX calling markers
+*Duplicated* that BUSCO called *Complete* — 9 of 124 in one genome, even when
+both tools scored identical proteins. Two causes, both now fixed and both
+visible in [`docs/benchmark-busco.md`](docs/benchmark-busco.md):
+
+1. **Bitscore retention.** BUSCO keeps only matches within 85% of a marker's
+   best hit. One marker had a hit at 296.8 and six between 17 and 30, all above
+   a permissive score cutoff; GenomeX counted all seven as copies.
+2. **Coverage axis.** Completeness is measured on the HMM profile, not the
+   sequence envelope. An envelope can run far past the modelled region, so
+   fragments were passing the length test.
+
+Duplication rates fell from 7–10% to 0–1.6%, and three of the four genomes moved
+from *possible contamination* to *clean* — the earlier verdicts were driven by
+markers that were never duplicated.
+
 ## Demo result
 
 Four beta-rhizobia, `./demo.sh`, 23 s warm (2 min cold):
 
-- all four 100% complete against `bacteria_odb10`, 7–10% duplicated markers;
-- each finished genome's symbiosis megaplasmid found and called a
-  `replicon_candidate`, not contamination — CP003865.1 (785 kb, 59.1% GC),
-  NC_010627.1 (595 kb), CU633751.1 (557 kb, *pRalta*);
+- three genomes clean; each finished one has its symbiosis megaplasmid found and
+  called a `replicon_candidate` rather than contamination — CP003865.1 (785 kb,
+  59.1% GC), NC_010627.1 (595 kb), CU633751.1 (557 kb, *pRalta*);
 - the draft assembly is the only one called `likely` contaminated: 8 contigs,
-  2.4% of its bases, plus 7 markers duplicated across contigs;
+  2.4% of its bases;
 - ANI recovers the species boundary: 98.2% within *P. phenoliruptrix*, 83.0%
   across species, 77.9% across genera;
 - 12,701 orthogroups over the four genomes; 1,900 core.
@@ -130,8 +158,10 @@ The contamination tests plant a known answer and check it is recovered:
 
 ## Limits
 
-- Completeness is HMMER against BUSCO's profiles with BUSCO's cutoffs — close to
-  BUSCO, not identical, and honest about it in every report.
+- Completeness is HMMER against BUSCO's profiles with BUSCO's cutoffs and
+  filtering rules. It matches BUSCO on every marker tested so far, but it is a
+  reimplementation: it does not re-predict genes per candidate region, so a
+  genome outside the tested set may still diverge.
 - Contamination detection is composition-based: blind to a close relative of the
   host, and unable to name a contaminant without a reference database.
 - Contigs below `--min-contig-length` are not scored.
@@ -146,15 +176,19 @@ output of the demo run (download and open it — GitHub does not render HTML inl
 
 ## Status
 
-Alpha, and the thresholds are the reason. They were calibrated against four
-genomes and a synthetic fixture. The algorithms are tested against planted ground
-truth and the plumbing is tested end-to-end against the real toolchain, but a
-sample of four is not a validation set. If you have a genome where a call is
-wrong, that is the [most useful contribution](CONTRIBUTING.md) you can make.
+Alpha, but no longer uncalibrated. Completeness and duplication now match BUSCO
+exactly on every marker of the demo set, and that comparison is reproducible
+from `bench/`.
 
-Not yet compared against real BUSCO or CheckM2 on a shared benchmark. Until that
-exists, treat the numbers as internally consistent rather than externally
-calibrated.
+What remains unvalidated is the part with no reference implementation to check
+against: the contamination thresholds, the replicon/contaminant split, and the
+island null model were all set against four genomes and a synthetic fixture. The
+algorithms are tested against planted ground truth and the plumbing runs
+end-to-end in CI, but four genomes is not a validation set. Contamination has not
+been compared against CheckM2.
+
+If you have a genome where a call is wrong, that is the
+[most useful contribution](CONTRIBUTING.md) you can make.
 
 ## Contributing
 

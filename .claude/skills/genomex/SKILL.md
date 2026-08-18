@@ -64,12 +64,18 @@ same `--outdir` reuses existing gene calls and marker tables, so iterate freely.
 single-copy markers found complete. Above 95% is a good bacterial draft; below 90%
 means genuinely missing core genes *or* the wrong lineage — check which before
 reporting. This is a HMMER scan against BUSCO's odb10 profiles using BUSCO's own
-cutoffs; call it "BUSCO-style", never "BUSCO said".
+cutoffs, plus its retention and coverage rules; call it "BUSCO-style", never
+"BUSCO said".
 
-**Duplication** (`markers.duplication_percent`). Markers found more than once.
-5–10% is unremarkable in Burkholderia-like genomes with large paralog families.
-What matters for contamination is the *cross-contig* subset, reported separately
-as `duplicated_markers_cross_contig`.
+**Duplication** (`markers.duplication_percent`). Markers found more than once,
+after BUSCO's 85%-of-best-hit retention rule has removed distant paralogs. On
+clean finished genomes expect 0–2%; anything above a few percent is worth
+explaining. What matters for contamination is the *cross-contig* subset,
+reported separately as `duplicated_markers_cross_contig`.
+
+These numbers match BUSCO 5.8.3 on every marker of the demo set
+(`docs/benchmark-busco.md`). Still say "BUSCO-style", not "BUSCO said" — it is a
+reimplementation that agrees, not the same program.
 
 **Contamination verdict**: `clean` / `possible` / `likely` / `undetermined`.
 Read the `reasons` list, never the verdict alone. Two distinctions the pipeline

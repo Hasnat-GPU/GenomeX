@@ -92,3 +92,25 @@ def test_marker_present_in_only_one_tool_is_not_silently_dropped():
     assert pairs[("Complete", "Absent")] == 1
     assert pairs[("Absent", "Complete")] == 1
     assert len(diffs) == 2, "a marker missing from one side must count as a disagreement"
+
+
+def test_busco_summary_json_keys_are_the_ones_busco_writes(tmp_path):
+    """Guards against silently reading the wrong keys and printing empty cells.
+
+    BUSCO writes 'Complete BUSCOs', not 'Complete'; the first version of this
+    script read the latter and produced a table full of None.
+    """
+    d = tmp_path / "g1"
+    d.mkdir()
+    (d / "short_summary.specific.bacteria_odb10.g1.json").write_text(
+        '{"results": {"one_line_summary": "C:99.2%[S:97.6%,D:1.6%],F:0.8%,M:0.0%,n:124",'
+        ' "Complete BUSCOs": 123, "Complete percentage": 99.2, "Single copy BUSCOs": 121,'
+        ' "Multi copy BUSCOs": 2, "Fragmented BUSCOs": 1, "Missing BUSCOs": 0, "n_markers": 124}}'
+    )
+    got = bench.load_busco_summary(tmp_path)["g1"]
+    assert got["Complete BUSCOs"] == 123
+
+    rows = bench._headline_rows(["g1"], {"g1": {"markers_total": 124}}, {"g1": got}, "proteins")
+    busco_row = [r for r in rows if "BUSCO" in r][0]
+    assert "123" in busco_row and "121" in busco_row
+    assert "None" not in busco_row, "empty cells mean the key mapping drifted"

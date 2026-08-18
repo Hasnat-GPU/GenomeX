@@ -22,6 +22,13 @@ report 100% complete while disagreeing about which markers are duplicated — an
 duplication is the number the contamination module consumes, so that is exactly
 where a silent disagreement would matter.
 
-Results: [`docs/benchmark-busco.md`](../docs/benchmark-busco.md).
+Results: [`docs/benchmark-busco.md`](../docs/benchmark-busco.md) — currently
+496/496 markers identical in both modes, across four genomes.
+
+That was not the first result. The initial run disagreed on 9 markers in one
+genome *with identical gene calls*, which located two real defects in
+`markers.py`: the missing 85%-of-best-hit retention rule, and completeness being
+measured on the sequence envelope rather than the HMM profile. Both are fixed;
+the benchmark is what found them.
 
 BUSCO output (`busco_out/`) is not committed; it is regenerable and large.
