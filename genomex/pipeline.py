@@ -29,7 +29,7 @@ from .compare import (
 from .contamination import ContaminationResult, detect_contamination, write_contig_table
 from .fasta import Assembly, assembly_stats
 from .genes import GeneCalls, predict_genes
-from .markers import Lineage, MarkerResult, scan_markers
+from .markers import Lineage, MarkerResult, scan_markers, write_marker_table
 from .runtime import Runtime
 
 DEFAULT_LINEAGE = Path.home() / "genomex-work" / "db" / "bacteria_odb10"
@@ -111,6 +111,7 @@ def analyze_genome(
     )
     gene_contig = {g.protein_id: g.contig for g in calls.genes}
     markers = scan_markers(calls.proteins_faa, lineage, outdir, rt, gene_contig=gene_contig)
+    write_marker_table(markers, outdir / "markers.tsv")
 
     contamination = detect_contamination(
         asm,

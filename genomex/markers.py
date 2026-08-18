@@ -223,6 +223,47 @@ def parse_domtbl(path: str | Path, lineage: Lineage, gene_contig: dict[str, str]
     return res
 
 
+MARKER_TABLE_COLUMNS = ["busco_id", "status", "protein_id", "contig", "score", "matched_aa"]
+
+
+def write_marker_table(result: MarkerResult, path: str | Path) -> Path:
+    """Per-marker classification, one row per marker.
+
+    Aggregate percentages hide disagreement: two tools can both report 100%
+    complete while differing on which markers are duplicated. This table is what
+    makes a marker-by-marker comparison against BUSCO possible.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    status_of = {}
+    for bid in result.single:
+        status_of[bid] = "Complete"
+    for bid in result.duplicated:
+        status_of[bid] = "Duplicated"
+    for bid in result.fragmented:
+        status_of[bid] = "Fragmented"
+    for bid in result.missing:
+        status_of[bid] = "Missing"
+
+    hits_by_marker: dict[str, list[MarkerHit]] = defaultdict(list)
+    for h in result.hits:
+        hits_by_marker[h.busco_id].append(h)
+
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\t".join(MARKER_TABLE_COLUMNS) + "\n")
+        for bid in sorted(status_of):
+            status = status_of[bid]
+            hits = sorted(hits_by_marker.get(bid, []), key=lambda h: -h.score)
+            if not hits:
+                fh.write(f"{bid}\t{status}\t-\t-\t-\t-\n")
+                continue
+            for h in hits:
+                fh.write(
+                    f"{bid}\t{status}\t{h.protein_id}\t{h.contig}\t{h.score:.1f}\t{h.matched_aa}\n"
+                )
+    return path
+
+
 def scan_markers(
     proteins_faa: str | Path,
     lineage: Lineage,

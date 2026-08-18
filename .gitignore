@@ -46,3 +46,7 @@ desktop.ini
 
 # --- separate deliverable, not part of this repo ---------------------------
 BioInformaticsX.*
+
+# BUSCO benchmark output: regenerable, large
+bench/busco_out/
+bench/*.log

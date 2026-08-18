@@ -102,3 +102,41 @@ def test_empty_table_is_all_missing(tmp_path):
     res = parse_domtbl(p, LINEAGE, {})
     assert len(res.missing) == 3
     assert res.completeness == 0.0
+
+
+def test_marker_table_lists_every_marker_with_its_class(tmp_path):
+    from genomex.markers import write_marker_table
+
+    p = _write(
+        tmp_path,
+        [
+            _row("c1_1", "m1", 120.0, 1, 99),    # single -> Complete
+            _row("c1_2", "m2", 300.0, 1, 120),   # short  -> Fragmented
+            _row("c9_5", "m3", 120.0, 1, 99),
+            _row("c4_2", "m3", 119.0, 1, 99),    # two copies -> Duplicated
+        ],
+    )
+    res = parse_domtbl(p, LINEAGE, {"c1_1": "c1", "c1_2": "c1", "c9_5": "c9", "c4_2": "c4"})
+    out = write_marker_table(res, tmp_path / "markers.tsv")
+
+    lines = out.read_text().strip().splitlines()
+    header, rows = lines[0], lines[1:]
+    assert header.split("\t")[:2] == ["busco_id", "status"]
+
+    status = {r.split("\t")[0]: r.split("\t")[1] for r in rows}
+    assert status == {"m1": "Complete", "m2": "Fragmented", "m3": "Duplicated"}
+    # a duplicated marker contributes one row per copy, so its contigs stay visible
+    m3_contigs = sorted(r.split("\t")[3] for r in rows if r.startswith("m3\t"))
+    assert m3_contigs == ["c4", "c9"]
+
+
+def test_marker_table_records_missing_markers_too(tmp_path):
+    from genomex.markers import write_marker_table
+
+    p = _write(tmp_path, [_row("c1_1", "m1", 120.0, 1, 99)])
+    res = parse_domtbl(p, LINEAGE, {"c1_1": "c1"})
+    out = write_marker_table(res, tmp_path / "markers.tsv")
+    rows = out.read_text().strip().splitlines()[1:]
+    missing = [r for r in rows if r.split("\t")[1] == "Missing"]
+    assert len(missing) == 2
+    assert all(r.split("\t")[2] == "-" for r in missing)
