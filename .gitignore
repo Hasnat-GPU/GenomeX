@@ -51,3 +51,4 @@ BioInformaticsX.*
 bench/busco_out/
 bench/*.log
 busco_downloads/
+busco_*.log
