@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: "GenomeX: unified genome QC — completeness, contamination, and comparative gene content"
+message: "If you use this software, please cite it together with the underlying tools."
+type: software
+authors:
+  - alias: Hasnat-GPU
+    name-particle: ""
+repository-code: "https://github.com/Hasnat-GPU/GenomeX"
+abstract: >-
+  GenomeX runs Prodigal, HMMER against BUSCO OrthoDB v10 profiles, MMseqs2 and
+  fastANI in a single pass over bacterial assemblies, and joins their outputs
+  into one report. It scores assembly completeness, detects cross-contamination
+  from tetranucleotide composition, GC, displaced single-copy markers and
+  compositional bimodality, distinguishes plasmids and secondary chromosomes
+  from contaminants, and partitions strain-unique genes between contamination
+  artefact, genomic-island acquisition and divergence — testing island
+  clustering against a permutation null before calling it acquisition.
+keywords:
+  - bioinformatics
+  - genome-assembly
+  - quality-control
+  - contamination-detection
+  - comparative-genomics
+  - pangenome
+  - average-nucleotide-identity
+license: MIT
+version: 0.1.0
+date-released: "2026-08-18"

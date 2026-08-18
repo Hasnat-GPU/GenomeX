@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Hasnat-GPU/GenomeX/security/advisories/new
+    about: Report privately. Do not open a public issue for anything exploitable.
+  - name: Question or discussion
+    url: https://github.com/Hasnat-GPU/GenomeX/discussions
+    about: Interpretation questions, method choices, and general discussion.

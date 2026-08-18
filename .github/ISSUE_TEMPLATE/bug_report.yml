@@ -1,0 +1,30 @@
+name: Bug report
+description: A crash, a wrong file, or behaviour that contradicts the documentation
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and full output
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: GenomeX version and platform
+      placeholder: "0.1.0, WSL Ubuntu 24.04, Python 3.13"
+    validations:
+      required: true
+  - type: textarea
+    id: tools
+    attributes:
+      label: External tool versions
+      description: The tool_versions block from provenance.json.
+      render: json

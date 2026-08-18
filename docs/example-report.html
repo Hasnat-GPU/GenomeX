@@ -1,0 +1,248 @@
+<title>GenomeX Report</title><style>
+:root{--bg:#fbfbf9;--panel:#fff;--ink:#1a1a18;--muted:#6b6b64;--line:#e4e3dd;
+--ok:#2f7d4f;--warn:#a86a12;--bad:#b3402f;--accent:#3d5a80;--chip:#f0efe9}
+:root:not([data-theme="light"]){}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+--bg:#16171a;--panel:#1e1f23;--ink:#e9e8e4;--muted:#9b9a93;--line:#2e3037;
+--ok:#57b97e;--warn:#d99b3a;--bad:#e0705c;--accent:#7fa5cc;--chip:#25272c}}
+:root[data-theme="dark"]{--bg:#16171a;--panel:#1e1f23;--ink:#e9e8e4;--muted:#9b9a93;
+--line:#2e3037;--ok:#57b97e;--warn:#d99b3a;--bad:#e0705c;--accent:#7fa5cc;--chip:#25272c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:40px 24px 80px}
+h1{font-size:26px;margin:0 0 4px;letter-spacing:-.01em}
+h2{font-size:19px;margin:40px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:22px 0 8px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:28px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:14px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.stat{background:var(--chip);border-radius:8px;padding:10px 12px}
+.stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.stat .v{font-size:18px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+.pill.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.bar{display:flex;height:16px;border-radius:4px;overflow:hidden;margin:8px 0 4px}
+.bar span{display:block}
+.legend{font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+code{background:var(--chip);padding:1px 5px;border-radius:4px;font-size:12px}
+.note{color:var(--muted);font-size:13px;margin-top:8px}
+ul.reasons{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
+.limits li{margin-bottom:6px;font-size:13px;color:var(--muted)}
+</style>
+<div class="wrap">
+<h1>GenomeX report</h1>
+<div class="sub">4 genome(s) &middot; 6 pairwise comparison(s) &middot; 12.8 s &middot; genomex 0.1.0</div>
+<h2>Genome quality</h2>
+<div class="card">
+<h3>GCA_000300095.1 &nbsp; <span class="pill warn">possible contamination</span> <span class="pill ok">usable</span></h3>
+<div class="grid">
+<div class="stat"><div class="k">size</div><div class="v">7.65 Mb</div></div>
+<div class="stat"><div class="k">contigs</div><div class="v">3</div></div>
+<div class="stat"><div class="k">N50</div><div class="v">4152.2 kb</div></div>
+<div class="stat"><div class="k">GC</div><div class="v">63.15%</div></div>
+<div class="stat"><div class="k">genes</div><div class="v">6771</div></div>
+<div class="stat"><div class="k">coding density</div><div class="v">85.7%</div></div>
+<div class="stat"><div class="k">completeness</div><div class="v">100.0%</div></div>
+<div class="stat"><div class="k">duplicated</div><div class="v">8.87%</div></div>
+</div>
+<div class="note"><code>C:100.0%[S:91.13%,D:8.87%],F:0.0%,M:0.0%,n:124</code></div>
+<div class="bar"><span style="width:91.13%;background:var(--ok)"></span><span style="width:8.87%;background:var(--warn)"></span></div><div class="legend"><span><i style="background:var(--ok)"></i>single copy 113</span><span><i style="background:var(--warn)"></i>duplicated 11</span><span><i style="background:var(--accent)"></i>fragmented 0</span><span><i style="background:var(--bad)"></i>missing 0</span></div>
+<h3>Contamination evidence</h3><ul class="reasons"><li>1 large contig(s) (10.27% of assembly) have distinct composition but carry no displaced core markers -- consistent with a plasmid or a second chromosome, not resolvable by composition alone</li><li>3 single-copy markers duplicated across different contigs</li><li>only 3 contigs scored -- too few for outlier statistics, so absolute composition thresholds were used and this verdict is weak evidence</li></ul>
+<div class="scroll"><table><thead><tr><th>composition bin</th><th>contigs</th><th>bases</th><th>% of assembly</th><th>mean GC%</th></tr></thead><tbody><tr><td>bin0</td><td class="num">2</td><td class="num">6,865,712</td><td class="num">89.73</td><td class="num">63.61</td></tr><tr><td>bin1</td><td class="num">1</td><td class="num">785,419</td><td class="num">10.27</td><td class="num">59.11</td></tr></tbody></table></div>
+<h3>Contigs carrying the evidence</h3>
+<div class="scroll"><table><thead><tr><th>contig</th><th>call</th><th>length</th><th>GC%</th><th>TNF dist</th><th>displaced markers</th><th>flags</th></tr></thead><tbody><tr><td>CP003865.1</td><td>replicon_candidate</td><td class="num">785,419</td><td class="num">59.11</td><td class="num">0.03637</td><td class="num">0</td><td>tnf_divergent(d=0.036); distinct_replicon_or_contaminant</td></tr><tr><td>CP003864.1</td><td>marker_conflict</td><td class="num">2,713,495</td><td class="num">63.7</td><td class="num">0.00066</td><td class="num">3</td><td>displaced_markers(n=3)</td></tr><tr><td>CP003863.1</td><td>marker_conflict</td><td class="num">4,152,217</td><td class="num">63.55</td><td class="num">0.00033</td><td class="num">3</td><td>displaced_markers(n=3)</td></tr></tbody></table></div>
+<div class="note"><b>contaminant_candidate</b> foreign composition with displaced core markers &middot; <b>replicon_candidate</b> distinct but marker-clean, i.e. plasmid or second chromosome as likely as contaminant &middot; <b>marker_conflict</b> shares duplicated core markers while composition looks native.</div>
+</div>
+<div class="card">
+<h3>GCA_040948545.1 &nbsp; <span class="pill bad">likely contaminated</span> <span class="pill bad">hold</span></h3>
+<div class="grid">
+<div class="stat"><div class="k">size</div><div class="v">6.75 Mb</div></div>
+<div class="stat"><div class="k">contigs</div><div class="v">77</div></div>
+<div class="stat"><div class="k">N50</div><div class="v">409.2 kb</div></div>
+<div class="stat"><div class="k">GC</div><div class="v">63.63%</div></div>
+<div class="stat"><div class="k">genes</div><div class="v">5996</div></div>
+<div class="stat"><div class="k">coding density</div><div class="v">86.7%</div></div>
+<div class="stat"><div class="k">completeness</div><div class="v">100.0%</div></div>
+<div class="stat"><div class="k">duplicated</div><div class="v">7.26%</div></div>
+</div>
+<div class="note"><code>C:100.0%[S:92.74%,D:7.26%],F:0.0%,M:0.0%,n:124</code></div>
+<div class="bar"><span style="width:92.74%;background:var(--ok)"></span><span style="width:7.26%;background:var(--warn)"></span></div><div class="legend"><span><i style="background:var(--ok)"></i>single copy 115</span><span><i style="background:var(--warn)"></i>duplicated 9</span><span><i style="background:var(--accent)"></i>fragmented 0</span><span><i style="background:var(--bad)"></i>missing 0</span></div>
+<h3>Contamination evidence</h3><ul class="reasons"><li>8 contigs (2.37% of assembly) deviate from core composition</li><li>2 large contig(s) (2.28% of assembly) have distinct composition but carry no displaced core markers -- consistent with a plasmid or a second chromosome, not resolvable by composition alone</li><li>7 single-copy markers duplicated across different contigs</li><li>composition is bimodal: minor bin holds 5.19% of bases at a 4.16 point GC offset</li></ul>
+<div class="scroll"><table><thead><tr><th>composition bin</th><th>contigs</th><th>bases</th><th>% of assembly</th><th>mean GC%</th></tr></thead><tbody><tr><td>bin0</td><td class="num">25</td><td class="num">6,365,364</td><td class="num">94.23</td><td class="num">63.86</td></tr><tr><td>bin1</td><td class="num">10</td><td class="num">350,796</td><td class="num">5.19</td><td class="num">59.7</td></tr></tbody></table></div>
+<h3>Contigs carrying the evidence</h3>
+<div class="scroll"><table><thead><tr><th>contig</th><th>call</th><th>length</th><th>GC%</th><th>TNF dist</th><th>displaced markers</th><th>flags</th></tr></thead><tbody><tr><td>JBFPKB010000035.1</td><td>contaminant_candidate</td><td class="num">3,323</td><td class="num">58.29</td><td class="num">0.14055</td><td class="num">0</td><td>tnf_outlier(z=36.0); gc_outlier(z=-4.5)</td></tr><tr><td>JBFPKB010000033.1</td><td>contaminant_candidate</td><td class="num">7,568</td><td class="num">58.13</td><td class="num">0.11969</td><td class="num">0</td><td>tnf_outlier(z=30.5); gc_outlier(z=-4.7)</td></tr><tr><td>JBFPKB010000029.1</td><td>contaminant_candidate</td><td class="num">29,594</td><td class="num">58.58</td><td class="num">0.06604</td><td class="num">0</td><td>tnf_outlier(z=16.4); gc_outlier(z=-4.3)</td></tr><tr><td>JBFPKB010000024.1</td><td>replicon_candidate</td><td class="num">52,639</td><td class="num">57.87</td><td class="num">0.05849</td><td class="num">0</td><td>tnf_outlier(z=14.5); gc_outlier(z=-4.9); distinct_replicon_or_contaminant</td></tr><tr><td>JBFPKB010000031.1</td><td>contaminant_candidate</td><td class="num">25,521</td><td class="num">58.74</td><td class="num">0.05717</td><td class="num">0</td><td>tnf_outlier(z=14.1); gc_outlier(z=-4.1)</td></tr><tr><td>JBFPKB010000027.1</td><td>contaminant_candidate</td><td class="num">39,241</td><td class="num">59.03</td><td class="num">0.05317</td><td class="num">0</td><td>tnf_outlier(z=13.1)</td></tr><tr><td>JBFPKB010000016.1</td><td>replicon_candidate</td><td class="num">101,598</td><td class="num">59.96</td><td class="num">0.05104</td><td class="num">0</td><td>tnf_outlier(z=12.5); distinct_replicon_or_contaminant</td></tr><tr><td>JBFPKB010000002.1</td><td>marker_conflict</td><td class="num">1,029,754</td><td class="num">64.26</td><td class="num">0.00088</td><td class="num">5</td><td>displaced_markers(n=5)</td></tr><tr><td>JBFPKB010000034.1</td><td>contaminant_candidate</td><td class="num">6,396</td><td class="num">66.98</td><td class="num">0.02971</td><td class="num">0</td><td>tnf_outlier(z=6.9)</td></tr><tr><td>JBFPKB010000032.1</td><td>contaminant_candidate</td><td class="num">15,137</td><td class="num">61.0</td><td class="num">0.02389</td><td class="num">0</td><td>tnf_outlier(z=5.4)</td></tr><tr><td>JBFPKB010000028.1</td><td>contaminant_candidate</td><td class="num">33,234</td><td class="num">61.51</td><td class="num">0.02057</td><td class="num">0</td><td>tnf_outlier(z=4.5)</td></tr><tr><td>JBFPKB010000022.1</td><td>marker_conflict</td><td class="num">62,876</td><td class="num">64.81</td><td class="num">0.00398</td><td class="num">2</td><td>displaced_markers(n=2)</td></tr></tbody></table></div>
+<div class="note"><b>contaminant_candidate</b> foreign composition with displaced core markers &middot; <b>replicon_candidate</b> distinct but marker-clean, i.e. plasmid or second chromosome as likely as contaminant &middot; <b>marker_conflict</b> shares duplicated core markers while composition looks native.</div>
+</div>
+<div class="card">
+<h3>GCF_000020045.1 &nbsp; <span class="pill warn">possible contamination</span> <span class="pill ok">usable</span></h3>
+<div class="grid">
+<div class="stat"><div class="k">size</div><div class="v">8.68 Mb</div></div>
+<div class="stat"><div class="k">contigs</div><div class="v">4</div></div>
+<div class="stat"><div class="k">N50</div><div class="v">2697.4 kb</div></div>
+<div class="stat"><div class="k">GC</div><div class="v">62.29%</div></div>
+<div class="stat"><div class="k">genes</div><div class="v">7814</div></div>
+<div class="stat"><div class="k">coding density</div><div class="v">85.5%</div></div>
+<div class="stat"><div class="k">completeness</div><div class="v">100.0%</div></div>
+<div class="stat"><div class="k">duplicated</div><div class="v">10.48%</div></div>
+</div>
+<div class="note"><code>C:100.0%[S:89.52%,D:10.48%],F:0.0%,M:0.0%,n:124</code></div>
+<div class="bar"><span style="width:89.52%;background:var(--ok)"></span><span style="width:10.48%;background:var(--warn)"></span></div><div class="legend"><span><i style="background:var(--ok)"></i>single copy 111</span><span><i style="background:var(--warn)"></i>duplicated 13</span><span><i style="background:var(--accent)"></i>fragmented 0</span><span><i style="background:var(--bad)"></i>missing 0</span></div>
+<h3>Contamination evidence</h3><ul class="reasons"><li>1 large contig(s) (6.86% of assembly) have distinct composition but carry no displaced core markers -- consistent with a plasmid or a second chromosome, not resolvable by composition alone</li><li>4 single-copy markers duplicated across different contigs</li><li>only 4 contigs scored -- too few for outlier statistics, so absolute composition thresholds were used and this verdict is weak evidence</li></ul>
+<div class="scroll"><table><thead><tr><th>composition bin</th><th>contigs</th><th>bases</th><th>% of assembly</th><th>mean GC%</th></tr></thead><tbody><tr><td>bin0</td><td class="num">3</td><td class="num">8,081,454</td><td class="num">93.14</td><td class="num">62.52</td></tr><tr><td>bin1</td><td class="num">1</td><td class="num">595,108</td><td class="num">6.86</td><td class="num">59.18</td></tr></tbody></table></div>
+<h3>Contigs carrying the evidence</h3>
+<div class="scroll"><table><thead><tr><th>contig</th><th>call</th><th>length</th><th>GC%</th><th>TNF dist</th><th>displaced markers</th><th>flags</th></tr></thead><tbody><tr><td>NC_010622.1</td><td>marker_conflict</td><td class="num">3,479,187</td><td class="num">63.03</td><td class="num">0.00098</td><td class="num">4</td><td>displaced_markers(n=4)</td></tr><tr><td>NC_010627.1</td><td>replicon_candidate</td><td class="num">595,108</td><td class="num">59.18</td><td class="num">0.02137</td><td class="num">0</td><td>tnf_divergent(d=0.021); distinct_replicon_or_contaminant</td></tr><tr><td>NC_010625.1</td><td>marker_conflict</td><td class="num">1,904,893</td><td class="num">61.87</td><td class="num">0.00115</td><td class="num">3</td><td>displaced_markers(n=3)</td></tr><tr><td>NC_010623.1</td><td>marker_conflict</td><td class="num">2,697,374</td><td class="num">62.33</td><td class="num">0.00037</td><td class="num">2</td><td>displaced_markers(n=2)</td></tr></tbody></table></div>
+<div class="note"><b>contaminant_candidate</b> foreign composition with displaced core markers &middot; <b>replicon_candidate</b> distinct but marker-clean, i.e. plasmid or second chromosome as likely as contaminant &middot; <b>marker_conflict</b> shares duplicated core markers while composition looks native.</div>
+</div>
+<div class="card">
+<h3>GCA_000069785.1 &nbsp; <span class="pill warn">possible contamination</span> <span class="pill ok">usable</span></h3>
+<div class="grid">
+<div class="stat"><div class="k">size</div><div class="v">6.48 Mb</div></div>
+<div class="stat"><div class="k">contigs</div><div class="v">3</div></div>
+<div class="stat"><div class="k">N50</div><div class="v">3416.9 kb</div></div>
+<div class="stat"><div class="k">GC</div><div class="v">66.99%</div></div>
+<div class="stat"><div class="k">genes</div><div class="v">5767</div></div>
+<div class="stat"><div class="k">coding density</div><div class="v">87.5%</div></div>
+<div class="stat"><div class="k">completeness</div><div class="v">100.0%</div></div>
+<div class="stat"><div class="k">duplicated</div><div class="v">8.06%</div></div>
+</div>
+<div class="note"><code>C:100.0%[S:91.94%,D:8.06%],F:0.0%,M:0.0%,n:124</code></div>
+<div class="bar"><span style="width:91.94%;background:var(--ok)"></span><span style="width:8.06%;background:var(--warn)"></span></div><div class="legend"><span><i style="background:var(--ok)"></i>single copy 114</span><span><i style="background:var(--warn)"></i>duplicated 10</span><span><i style="background:var(--accent)"></i>fragmented 0</span><span><i style="background:var(--bad)"></i>missing 0</span></div>
+<h3>Contamination evidence</h3><ul class="reasons"><li>1 large contig(s) (8.6% of assembly) have distinct composition but carry no displaced core markers -- consistent with a plasmid or a second chromosome, not resolvable by composition alone</li><li>4 single-copy markers duplicated across different contigs</li><li>only 3 contigs scored -- too few for outlier statistics, so absolute composition thresholds were used and this verdict is weak evidence</li></ul>
+<div class="scroll"><table><thead><tr><th>composition bin</th><th>contigs</th><th>bases</th><th>% of assembly</th><th>mean GC%</th></tr></thead><tbody><tr><td>bin0</td><td class="num">2</td><td class="num">5,919,322</td><td class="num">91.4</td><td class="num">67.68</td></tr><tr><td>bin1</td><td class="num">1</td><td class="num">557,200</td><td class="num">8.6</td><td class="num">59.66</td></tr></tbody></table></div>
+<h3>Contigs carrying the evidence</h3>
+<div class="scroll"><table><thead><tr><th>contig</th><th>call</th><th>length</th><th>GC%</th><th>TNF dist</th><th>displaced markers</th><th>flags</th></tr></thead><tbody><tr><td>CU633751.1</td><td>replicon_candidate</td><td class="num">557,200</td><td class="num">59.66</td><td class="num">0.06804</td><td class="num">0</td><td>tnf_divergent(d=0.068); gc_divergent(-7.3pp); distinct_replicon_or_contaminant</td></tr><tr><td>CU633750.1</td><td>marker_conflict</td><td class="num">2,502,411</td><td class="num">67.91</td><td class="num">0.00086</td><td class="num">4</td><td>displaced_markers(n=4)</td></tr><tr><td>CU633749.1</td><td>marker_conflict</td><td class="num">3,416,911</td><td class="num">67.51</td><td class="num">0.00042</td><td class="num">4</td><td>displaced_markers(n=4)</td></tr></tbody></table></div>
+<div class="note"><b>contaminant_candidate</b> foreign composition with displaced core markers &middot; <b>replicon_candidate</b> distinct but marker-clean, i.e. plasmid or second chromosome as likely as contaminant &middot; <b>marker_conflict</b> shares duplicated core markers while composition looks native.</div>
+</div>
+<h2>Pangenome</h2>
+<div class="card"><div class="grid">
+<div class="stat"><div class="k">orthogroups</div><div class="v">12701</div></div>
+<div class="stat"><div class="k">core</div><div class="v">1900</div></div>
+<div class="stat"><div class="k">accessory</div><div class="v">3745</div></div>
+<div class="stat"><div class="k">strain-unique</div><div class="v">7056</div></div>
+<div class="stat"><div class="k">core share</div><div class="v">14.96%</div></div>
+</div>
+<div class="note">MMseqs2 easy-cluster at 0.5 identity, 0.8 coverage, across 4 genomes.</div></div>
+<h2>Why these genomes differ</h2>
+<div class="card">
+<h3>GCA_000300095.1 vs GCA_040948545.1</h3>
+<div class="grid">
+<div class="stat"><div class="k">ANI</div><div class="v">98.2487%</div></div>
+<div class="stat"><div class="k">verdict</div><div class="v">same species</div></div>
+<div class="stat"><div class="k">shared orthogroups</div><div class="v">5053</div></div>
+<div class="stat"><div class="k">unique to GCA_000300095.1</div><div class="v">1220</div></div>
+<div class="stat"><div class="k">unique to GCA_040948545.1</div><div class="v">541</div></div>
+</div>
+<h3>Genes only in GCA_000300095.1 &mdash; why</h3>
+<div class="scroll"><table><thead><tr><th>explanation</th><th>genes</th><th>share</th></tr></thead><tbody><tr><td>clustered in genomic island (acquisition/HGT candidate)</td><td class="num">1108</td><td class="num">90.8%</td></tr><tr><td>isolated gene, typical composition (divergence or gene loss)</td><td class="num">80</td><td class="num">6.6%</td></tr><tr><td>isolated gene with atypical GC (acquisition candidate)</td><td class="num">32</td><td class="num">2.6%</td></tr></tbody></table></div>
+<div class="note">73 genomic island(s) holding 1108 genes; 0 genes sit on contigs flagged as compositionally foreign. Permutation null expects 600.4 island genes here, so clustering is 1.85x expected: above chance.</div>
+<h3>Genes only in GCA_040948545.1 &mdash; why</h3>
+<div class="scroll"><table><thead><tr><th>explanation</th><th>genes</th><th>share</th></tr></thead><tbody><tr><td>clustered in genomic island (acquisition/HGT candidate)</td><td class="num">320</td><td class="num">59.1%</td></tr><tr><td>isolated gene, typical composition (divergence or gene loss)</td><td class="num">95</td><td class="num">17.6%</td></tr><tr><td>contamination-suspect contig</td><td class="num">69</td><td class="num">12.8%</td></tr><tr><td>isolated gene with atypical GC (acquisition candidate)</td><td class="num">57</td><td class="num">10.5%</td></tr></tbody></table></div>
+<div class="note">45 genomic island(s) holding 381 genes; 69 genes sit on contigs flagged as compositionally foreign. Permutation null expects 157.0 island genes here, so clustering is 2.43x expected: above chance.</div>
+<div class="note">fastANI reports no value below roughly 80% ANI; a null here means the genomes are more distant than the method resolves, not identical.</div>
+</div>
+<div class="card">
+<h3>GCA_000300095.1 vs GCF_000020045.1</h3>
+<div class="grid">
+<div class="stat"><div class="k">ANI</div><div class="v">83.0158%</div></div>
+<div class="stat"><div class="k">verdict</div><div class="v">different species</div></div>
+<div class="stat"><div class="k">shared orthogroups</div><div class="v">4159</div></div>
+<div class="stat"><div class="k">unique to GCA_000300095.1</div><div class="v">2158</div></div>
+<div class="stat"><div class="k">unique to GCF_000020045.1</div><div class="v">3086</div></div>
+</div>
+<h3>Genes only in GCA_000300095.1 &mdash; why</h3>
+<div class="scroll"><table><thead><tr><th>explanation</th><th>genes</th><th>share</th></tr></thead><tbody><tr><td>clustered in genomic island (acquisition/HGT candidate)</td><td class="num">1772</td><td class="num">82.1%</td></tr><tr><td>isolated gene, typical composition (divergence or gene loss)</td><td class="num">286</td><td class="num">13.3%</td></tr><tr><td>isolated gene with atypical GC (acquisition candidate)</td><td class="num">100</td><td class="num">4.6%</td></tr></tbody></table></div>
+<div class="note">189 genomic island(s) holding 1772 genes; 0 genes sit on contigs flagged as compositionally foreign. Permutation null expects 1264.9 island genes here, so clustering is 1.4x expected: NOT distinguishable from chance -- do not read these as acquisitions.</div>
+<h3>Genes only in GCF_000020045.1 &mdash; why</h3>
+<div class="scroll"><table><thead><tr><th>explanation</th><th>genes</th><th>share</th></tr></thead><tbody><tr><td>clustered in genomic island (acquisition/HGT candidate)</td><td class="num">2672</td><td class="num">86.6%</td></tr><tr><td>isolated gene, typical composition (divergence or gene loss)</td><td class="num">348</td><td class="num">11.3%</td></tr><tr><td>isolated gene with atypical GC (acquisition candidate)</td><td class="num">66</td><td class="num">2.1%</td></tr></tbody></table></div>
+<div class="note">242 genomic island(s) holding 2672 genes; 0 genes sit on contigs flagged as compositionally foreign. Permutation null expects 2328.5 island genes here, so clustering is 1.15x expected: NOT distinguishable from chance -- do not read these as acquisitions.</div>
+<div class="note">fastANI reports no value below roughly 80% ANI; a null here means the genomes are more distant than the method resolves, not identical.</div>
+</div>
+<div class="card">
+<h3>GCA_000300095.1 vs GCA_000069785.1</h3>
+<div class="grid">
+<div class="stat"><div class="k">ANI</div><div class="v">77.9315%</div></div>
+<div class="stat"><div class="k">verdict</div><div class="v">different species</div></div>
+<div class="stat"><div class="k">shared orthogroups</div><div class="v">2099</div></div>
+<div class="stat"><div class="k">unique to GCA_000300095.1</div><div class="v">4386</div></div>
+<div class="stat"><div class="k">unique to GCA_000069785.1</div><div class="v">3450</div></div>
+</div>
+<h3>Genes only in GCA_000300095.1 &mdash; why</h3>
+<div class="scroll"><table><thead><tr><th>explanation</th><th>genes</th><th>share</th></tr></thead><tbody><tr><td>clustered in genomic island (acquisition/HGT candidate)</td><td class="num">4139</td><td class="num">94.4%</td></tr><tr><td>isolated gene, typical composition (divergence or gene loss)</td><td class="num">197</td><td class="num">4.5%</td></tr><tr><td>isolated gene with atypical GC (acquisition candidate)</td><td class="num">50</td><td class="num">1.1%</td></tr></tbody></table></div>
+<div class="note">253 genomic island(s) holding 4139 genes; 0 genes sit on contigs flagged as compositionally foreign. Permutation null expects 4135.3 island genes here, so clustering is 1.0x expected: NOT distinguishable from chance -- do not read these as acquisitions.</div>
+<h3>Genes only in GCA_000069785.1 &mdash; why</h3>
+<div class="scroll"><table><thead><tr><th>explanation</th><th>genes</th><th>share</th></tr></thead><tbody><tr><td>clustered in genomic island (acquisition/HGT candidate)</td><td class="num">3184</td><td class="num">92.3%</td></tr><tr><td>isolated gene, typical composition (divergence or gene loss)</td><td class="num">209</td><td class="num">6.1%</td></tr><tr><td>isolated gene with atypical GC (acquisition candidate)</td><td class="num">57</td><td class="num">1.7%</td></tr></tbody></table></div>
+<div class="note">278 genomic island(s) holding 3184 genes; 0 genes sit on contigs flagged as compositionally foreign. Permutation null expects 3143.6 island genes here, so clustering is 1.01x expected: NOT distinguishable from chance -- do not read these as acquisitions.</div>
+<div class="note">fastANI reports no value below roughly 80% ANI; a null here means the genomes are more distant than the method resolves, not identical.</div>
+</div>
+<div class="card">
+<h3>GCA_040948545.1 vs GCF_000020045.1</h3>
+<div class="grid">
+<div class="stat"><div class="k">ANI</div><div class="v">81.8044%</div></div>
+<div class="stat"><div class="k">verdict</div><div class="v">different species</div></div>
+<div class="stat"><div class="k">shared orthogroups</div><div class="v">3932</div></div>
+<div class="stat"><div class="k">unique to GCA_040948545.1</div><div class="v">1698</div></div>
+<div class="stat"><div class="k">unique to GCF_000020045.1</div><div class="v">3338</div></div>
+</div>
+<h3>Genes only in GCA_040948545.1 &mdash; why</h3>
+<div class="scroll"><table><thead><tr><th>explanation</th><th>genes</th><th>share</th></tr></thead><tbody><tr><td>clustered in genomic island (acquisition/HGT candidate)</td><td class="num">1209</td><td class="num">71.2%</td></tr><tr><td>isolated gene, typical composition (divergence or gene loss)</td><td class="num">310</td><td class="num">18.3%</td></tr><tr><td>isolated gene with atypical GC (acquisition candidate)</td><td class="num">97</td><td class="num">5.7%</td></tr><tr><td>contamination-suspect contig</td><td class="num">82</td><td class="num">4.8%</td></tr></tbody></table></div>
+<div class="note">163 genomic island(s) holding 1282 genes; 82 genes sit on contigs flagged as compositionally foreign. Permutation null expects 937.7 island genes here, so clustering is 1.37x expected: NOT distinguishable from chance -- do not read these as acquisitions.</div>
+<h3>Genes only in GCF_000020045.1 &mdash; why</h3>
+<div class="scroll"><table><thead><tr><th>explanation</th><th>genes</th><th>share</th></tr></thead><tbody><tr><td>clustered in genomic island (acquisition/HGT candidate)</td><td class="num">2960</td><td class="num">88.7%</td></tr><tr><td>isolated gene, typical composition (divergence or gene loss)</td><td class="num">325</td><td class="num">9.7%</td></tr><tr><td>isolated gene with atypical GC (acquisition candidate)</td><td class="num">53</td><td class="num">1.6%</td></tr></tbody></table></div>
+<div class="note">230 genomic island(s) holding 2960 genes; 0 genes sit on contigs flagged as compositionally foreign. Permutation null expects 2655.6 island genes here, so clustering is 1.11x expected: NOT distinguishable from chance -- do not read these as acquisitions.</div>
+<div class="note">fastANI reports no value below roughly 80% ANI; a null here means the genomes are more distant than the method resolves, not identical.</div>
+</div>
+<div class="card">
+<h3>GCA_040948545.1 vs GCA_000069785.1</h3>
+<div class="grid">
+<div class="stat"><div class="k">ANI</div><div class="v">77.8214%</div></div>
+<div class="stat"><div class="k">verdict</div><div class="v">different species</div></div>
+<div class="stat"><div class="k">shared orthogroups</div><div class="v">2047</div></div>
+<div class="stat"><div class="k">unique to GCA_040948545.1</div><div class="v">3723</div></div>
+<div class="stat"><div class="k">unique to GCA_000069785.1</div><div class="v">3513</div></div>
+</div>
+<h3>Genes only in GCA_040948545.1 &mdash; why</h3>
+<div class="scroll"><table><thead><tr><th>explanation</th><th>genes</th><th>share</th></tr></thead><tbody><tr><td>clustered in genomic island (acquisition/HGT candidate)</td><td class="num">3339</td><td class="num">89.7%</td></tr><tr><td>isolated gene, typical composition (divergence or gene loss)</td><td class="num">232</td><td class="num">6.2%</td></tr><tr><td>contamination-suspect contig</td><td class="num">104</td><td class="num">2.8%</td></tr><tr><td>isolated gene with atypical GC (acquisition candidate)</td><td class="num">48</td><td class="num">1.3%</td></tr></tbody></table></div>
+<div class="note">245 genomic island(s) holding 3434 genes; 104 genes sit on contigs flagged as compositionally foreign. Permutation null expects 3380.0 island genes here, so clustering is 1.02x expected: NOT distinguishable from chance -- do not read these as acquisitions.</div>
+<h3>Genes only in GCA_000069785.1 &mdash; why</h3>
+<div class="scroll"><table><thead><tr><th>explanation</th><th>genes</th><th>share</th></tr></thead><tbody><tr><td>clustered in genomic island (acquisition/HGT candidate)</td><td class="num">3243</td><td class="num">92.3%</td></tr><tr><td>isolated gene, typical composition (divergence or gene loss)</td><td class="num">212</td><td class="num">6.0%</td></tr><tr><td>isolated gene with atypical GC (acquisition candidate)</td><td class="num">58</td><td class="num">1.7%</td></tr></tbody></table></div>
+<div class="note">265 genomic island(s) holding 3243 genes; 0 genes sit on contigs flagged as compositionally foreign. Permutation null expects 3215.5 island genes here, so clustering is 1.01x expected: NOT distinguishable from chance -- do not read these as acquisitions.</div>
+<div class="note">fastANI reports no value below roughly 80% ANI; a null here means the genomes are more distant than the method resolves, not identical.</div>
+</div>
+<div class="card">
+<h3>GCF_000020045.1 vs GCA_000069785.1</h3>
+<div class="grid">
+<div class="stat"><div class="k">ANI</div><div class="v">77.913%</div></div>
+<div class="stat"><div class="k">verdict</div><div class="v">different species</div></div>
+<div class="stat"><div class="k">shared orthogroups</div><div class="v">2155</div></div>
+<div class="stat"><div class="k">unique to GCF_000020045.1</div><div class="v">5312</div></div>
+<div class="stat"><div class="k">unique to GCA_000069785.1</div><div class="v">3396</div></div>
+</div>
+<h3>Genes only in GCF_000020045.1 &mdash; why</h3>
+<div class="scroll"><table><thead><tr><th>explanation</th><th>genes</th><th>share</th></tr></thead><tbody><tr><td>clustered in genomic island (acquisition/HGT candidate)</td><td class="num">5047</td><td class="num">95.0%</td></tr><tr><td>isolated gene, typical composition (divergence or gene loss)</td><td class="num">223</td><td class="num">4.2%</td></tr><tr><td>isolated gene with atypical GC (acquisition candidate)</td><td class="num">42</td><td class="num">0.8%</td></tr></tbody></table></div>
+<div class="note">268 genomic island(s) holding 5047 genes; 0 genes sit on contigs flagged as compositionally foreign. Permutation null expects 5035.0 island genes here, so clustering is 1.0x expected: NOT distinguishable from chance -- do not read these as acquisitions.</div>
+<h3>Genes only in GCA_000069785.1 &mdash; why</h3>
+<div class="scroll"><table><thead><tr><th>explanation</th><th>genes</th><th>share</th></tr></thead><tbody><tr><td>clustered in genomic island (acquisition/HGT candidate)</td><td class="num">3114</td><td class="num">91.7%</td></tr><tr><td>isolated gene, typical composition (divergence or gene loss)</td><td class="num">224</td><td class="num">6.6%</td></tr><tr><td>isolated gene with atypical GC (acquisition candidate)</td><td class="num">58</td><td class="num">1.7%</td></tr></tbody></table></div>
+<div class="note">282 genomic island(s) holding 3114 genes; 0 genes sit on contigs flagged as compositionally foreign. Permutation null expects 3072.7 island genes here, so clustering is 1.01x expected: NOT distinguishable from chance -- do not read these as acquisitions.</div>
+<div class="note">fastANI reports no value below roughly 80% ANI; a null here means the genomes are more distant than the method resolves, not identical.</div>
+</div>
+<h2>Provenance</h2><div class='card'>
+<div class="scroll"><table><thead><tr><th>tool</th><th>version</th></tr></thead><tbody><tr><td>fastANI</td><td>version 1.34</td></tr><tr><td>hmmsearch</td><td># hmmsearch :: search profile(s) against a sequence database</td></tr><tr><td>mmseqs</td><td>18.8cc5c</td></tr><tr><td>prodigal</td><td>Prodigal V2.6.3: February, 2016</td></tr></tbody></table></div>
+<div class="note">Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39 &middot; Python 3.14.6 &middot; 6 external tool invocations recorded in <code>provenance.json</code>.</div></div>
+<h2>What this report does not tell you</h2><div class='card'><ul class='limits'>
+<li>Completeness is a HMMER scan against BUSCO&#x27;s odb10 profiles with BUSCO&#x27;s own score and length cutoffs -- close to BUSCO, but not BUSCO. It does not re-predict genes per marker region, so counts can differ by a marker or two.</li>
+<li>Contamination detection is composition-based. It sees organisms whose k-mer signature differs from the host; it is blind to a close relative of the host, and it cannot name the contaminant without a reference database.</li>
+<li>Contigs below the minimum length are not scored -- a short contaminant contig can pass unexamined.</li>
+<li>Gene functions are not assigned. A gene called unique here is unique in sequence-cluster terms, not annotated as a known function.</li>
+<li>Genomic islands are inferred from runs of consecutive unique genes, not from integrase detection, tRNA boundaries, or codon-usage models. Treat them as candidates.</li>
+<li>fastANI reports nothing below roughly 80% identity; an unresolved ANI means distant, not identical.</li>
+</ul></div>
+</div>

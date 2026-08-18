@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: unit (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Run tests that need no external tools
+        run: python -m pytest tests/ -q -m "not tools"
+
+  integration:
+    name: integration (real toolchain)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Prodigal, HMMER, MMseqs2, fastANI
+        uses: mamba-org/setup-micromamba@f457c30a868e4760d3a6fcea5f25dc655b8edf39 # v3.2.1
+        with:
+          environment-name: gx
+          create-args: >-
+            python=3.12 numpy pytest
+            prodigal hmmer mmseqs2 mash fastani
+          condarc: |
+            channels:
+              - conda-forge
+              - bioconda
+
+      - name: Fetch the BUSCO bacteria_odb10 marker set
+        run: |
+          mkdir -p "$HOME/genomex-work/db"
+          cd "$HOME/genomex-work/db"
+          curl -fsSL -o bacteria_odb10.tar.gz \
+            https://busco-data.ezlab.org/v5/data/lineages/bacteria_odb10.2024-01-08.tar.gz
+          tar xzf bacteria_odb10.tar.gz
+          test "$(ls bacteria_odb10/hmms | wc -l)" -eq 124
+
+      - name: Record tool versions
+        run: |
+          prodigal -v 2>&1 | head -1 || true
+          hmmsearch -h | head -2
+          mmseqs version
+          fastANI --version 2>&1 | head -1 || true
+
+      - name: Full suite, external tools included
+        run: python -m pytest tests/ -q
+
+  hygiene:
+    name: hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Community files present
+        run: |
+          for f in README.md LICENSE CONTRIBUTING.md CODE_OF_CONDUCT.md \
+                   SECURITY.md CHANGELOG.md .github/PULL_REQUEST_TEMPLATE.md; do
+            test -f "$f" || { echo "missing $f"; exit 1; }
+          done
+      - name: No action pinned to a moving tag
+        run: |
+          if grep -rnE 'uses: [^@]+@v[0-9]' .github/workflows/; then
+            echo "actions must be pinned to a full commit SHA"; exit 1
+          fi
+      - name: Workflows parse as YAML
+        run: |
+          python -c "import yaml,glob;[yaml.safe_load(open(f,encoding='utf-8')) for f in glob.glob('.github/**/*.yml',recursive=True)];print('yaml ok')"

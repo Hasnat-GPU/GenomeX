@@ -1,0 +1,48 @@
+# --- GenomeX outputs -------------------------------------------------------
+# Pipeline runs are large (a 4-genome run is ~90 MB of proteomes and HMMER
+# tables) and fully reproducible from demo.sh. An example report is committed
+# under docs/ instead.
+runs/
+*.domtbl
+*.hmmer.txt
+
+# --- genomic data ----------------------------------------------------------
+# Assemblies live outside the repo; only metadata is tracked.
+data/Bacteria/
+*.fna
+*.faa
+*.ffn
+*.fastq
+*.fq
+*.sam
+*.bam
+*.msh
+!tests/fixtures/*.fna
+
+# --- Python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# --- OS / editor -----------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/
+
+# --- separate deliverable, not part of this repo ---------------------------
+BioInformaticsX.*

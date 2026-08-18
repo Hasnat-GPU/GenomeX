@@ -1,0 +1,438 @@
+"""Is this assembly one organism, or more than one?
+
+Four independent signals, deliberately chosen so that no single one can carry a
+verdict on its own:
+
+  1. Tetranucleotide frequency (TNF).  Genome-wide 4-mer composition is
+     species-characteristic and roughly constant along a chromosome, so a contig
+     whose TNF vector sits far from the assembly's core composition came from
+     somewhere else.  (Teeling et al. 2004; the signal every binner uses.)
+  2. GC content.  Cruder than TNF and correlated with it, but interpretable and
+     hard to argue with when it is extreme.
+  3. Duplicated single-copy markers.  If a marker that must occur once per genome
+     occurs on two unrelated contigs, either the assembly is redundant or it
+     contains two genomes.  This is how CheckM detects contamination.
+  4. Bimodality.  A deterministic 2-means split in TNF-PCA space: if the
+     assembly really is a mixture, the split is stable, both bins are large, and
+     they differ in GC.  If it is one organism, the split is arbitrary.
+
+Signals are reported separately and then combined, so a reader can disagree with
+the verdict while still trusting the evidence.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import numpy as np
+
+from .fasta import Assembly, Contig
+
+# 4-mers: 256 raw, 136 canonical after merging each with its reverse complement.
+K = 4
+_COMPLEMENT = {0: 3, 1: 2, 2: 1, 3: 0}  # A<->T, C<->G with A=0,C=1,G=2,T=3
+
+_LUT = np.full(256, 255, dtype=np.uint8)
+for _base, _code in zip(b"ACGTacgt", [0, 1, 2, 3, 0, 1, 2, 3]):
+    _LUT[_base] = _code
+
+
+def _revcomp_index(idx: int) -> int:
+    """Reverse-complement of a 4-mer expressed as a base-4 integer."""
+    out = 0
+    for i in range(K):
+        base = (idx >> (2 * i)) & 3
+        out = (out << 2) | _COMPLEMENT[base]
+    return out
+
+
+_CANON_GROUP = {}
+_canon_order: list[int] = []
+for _i in range(4**K):
+    _rc = _revcomp_index(_i)
+    _key = min(_i, _rc)
+    if _key not in _CANON_GROUP:
+        _CANON_GROUP[_key] = len(_canon_order)
+        _canon_order.append(_key)
+N_CANON = len(_canon_order)  # 136
+_RAW_TO_CANON = np.array(
+    [_CANON_GROUP[min(i, _revcomp_index(i))] for i in range(4**K)], dtype=np.int32
+)
+
+
+def tetranucleotide_freq(seq: str) -> np.ndarray:
+    """Canonical 4-mer frequency vector (length 136) for one sequence."""
+    codes = _LUT[np.frombuffer(seq.encode("ascii", "replace"), dtype=np.uint8)]
+    if codes.size < K:
+        return np.zeros(N_CANON, dtype=np.float64)
+    valid = codes != 255
+    windows = np.lib.stride_tricks.sliding_window_view(codes, K)
+    window_ok = np.lib.stride_tricks.sliding_window_view(valid, K).all(axis=1)
+    if not window_ok.any():
+        return np.zeros(N_CANON, dtype=np.float64)
+    w = windows[window_ok].astype(np.int32)
+    raw = (w[:, 0] << 6) | (w[:, 1] << 4) | (w[:, 2] << 2) | w[:, 3]
+    counts = np.bincount(_RAW_TO_CANON[raw], minlength=N_CANON).astype(np.float64)
+    total = counts.sum()
+    return counts / total if total else counts
+
+
+def _robust_z(values: np.ndarray) -> np.ndarray:
+    """Median/MAD z-score. Robust to the very outliers we are hunting for."""
+    med = float(np.median(values))
+    mad = float(np.median(np.abs(values - med)))
+    scale = 1.4826 * mad
+    if scale < 1e-12:
+        std = float(values.std())
+        scale = std if std > 1e-12 else 1.0
+    return (values - med) / scale
+
+
+def _two_means(points: np.ndarray, iterations: int = 50) -> np.ndarray:
+    """Deterministic 2-means: seed at the extremes of the first component.
+
+    No RNG, so a run is reproducible byte-for-byte -- which matters more here
+    than the marginal quality of a random restart.
+    """
+    if len(points) < 2:
+        return np.zeros(len(points), dtype=int)
+    axis = points[:, 0]
+    centroids = np.array([points[axis.argmin()], points[axis.argmax()]], dtype=float)
+    labels = np.zeros(len(points), dtype=int)
+    for _ in range(iterations):
+        d = np.linalg.norm(points[:, None, :] - centroids[None, :, :], axis=2)
+        new_labels = d.argmin(axis=1)
+        if np.array_equal(new_labels, labels):
+            break
+        labels = new_labels
+        for c in (0, 1):
+            if (labels == c).any():
+                centroids[c] = points[labels == c].mean(axis=0)
+    return labels
+
+
+@dataclass
+class ContigVerdict:
+    name: str
+    length: int
+    gc_percent: float
+    tnf_distance: float
+    tnf_z: float
+    gc_z: float
+    duplicated_markers: int          # duplicated markers whose other copies sit elsewhere
+    bin_label: int
+    flags: list[str] = field(default_factory=list)
+    suspicion: float = 0.0
+    # core                  composition matches the assembly and no marker conflict
+    # contaminant_candidate compositionally foreign; the real contamination signal
+    # replicon_candidate    large and distinct but no displaced markers: plasmid/chromid
+    # marker_conflict       shares duplicated core markers but composition is typical
+    call: str = "core"
+
+    @property
+    def suspect(self) -> bool:
+        return bool(self.flags)
+
+
+@dataclass
+class ContaminationResult:
+    verdict: str                      # clean | possible | likely
+    reasons: list[str]
+    suspect_bp: int
+    suspect_fraction: float
+    n_suspect_contigs: int
+    contigs: list[ContigVerdict]
+    bins: dict
+    params: dict
+
+    def summary(self) -> dict:
+        return {
+            "verdict": self.verdict,
+            "reasons": self.reasons,
+            "suspect_contigs": self.n_suspect_contigs,
+            "suspect_bp": self.suspect_bp,
+            "suspect_fraction_percent": round(100 * self.suspect_fraction, 2),
+            "replicon_candidates": [
+                {"contig": c.name, "length": c.length, "gc_percent": c.gc_percent}
+                for c in self.contigs if c.call == "replicon_candidate"
+            ],
+            "marker_conflict_contigs": [
+                c.name for c in self.contigs if c.call == "marker_conflict"
+            ],
+            "bins": self.bins,
+            "params": self.params,
+        }
+
+    def suspect_contig_names(self) -> set[str]:
+        """Contigs believed to be foreign. Excludes plasmid/chromid candidates,
+        whose genes are real biology and must not be written off as artefacts."""
+        return {c.name for c in self.contigs if c.call == "contaminant_candidate"}
+
+    def flagged_contig_names(self) -> set[str]:
+        """Every contig with any composition flag, replicon candidates included."""
+        return {c.name for c in self.contigs if c.suspect}
+
+
+def detect_contamination(
+    asm: Assembly,
+    *,
+    duplicated_marker_contigs: dict[str, list[str]] | None = None,
+    min_contig_length: int = 3000,
+    tnf_z_threshold: float = 4.0,
+    gc_z_threshold: float = 4.0,
+    marker_dup_threshold: int = 2,
+    min_contigs_for_zscores: int = 8,
+    tnf_distance_threshold: float = 0.02,
+    gc_absolute_threshold: float = 5.0,
+    replicon_min_length: int = 50_000,
+) -> ContaminationResult:
+    """Score every contig, then combine per-contig evidence into one verdict.
+
+    Two corrections that real assemblies force:
+
+    * Below `min_contigs_for_zscores` sequences there is no population to compute
+      a robust z-score against -- a finished 3-replicon genome would otherwise
+      produce z=74 from a MAD of nearly zero.  Absolute thresholds are used there
+      instead, and the verdict stays deliberately weaker.
+    * A large, compositionally distinct contig carrying no displaced single-copy
+      markers is at least as likely to be a plasmid or a chromid as a
+      contaminant.  Composition alone cannot separate those, so it is called a
+      `replicon_candidate` and excluded from the contamination fraction.
+    """
+    duplicated_marker_contigs = duplicated_marker_contigs or {}
+
+    # Only *cross-contig* duplication is contamination evidence at contig level:
+    # a marker duplicated twice on one contig is a paralog, not a second organism.
+    dup_per_contig: dict[str, int] = {}
+    for _busco, contigs in duplicated_marker_contigs.items():
+        distinct = set(contigs)
+        if len(distinct) < 2:
+            continue
+        for name in distinct:
+            dup_per_contig[name] = dup_per_contig.get(name, 0) + 1
+
+    scored: list[Contig] = [c for c in asm.contigs if c.length >= min_contig_length]
+    total_bp = asm.total_bp
+
+    if len(scored) < 3:
+        return ContaminationResult(
+            verdict="undetermined",
+            reasons=[
+                f"only {len(scored)} contigs of at least {min_contig_length} bp -- "
+                "composition-based detection needs more sequence to establish a baseline"
+            ],
+            suspect_bp=0,
+            suspect_fraction=0.0,
+            n_suspect_contigs=0,
+            contigs=[],
+            bins={},
+            params={"min_contig_length": min_contig_length},
+        )
+
+    tnf = np.vstack([tetranucleotide_freq(c.seq) for c in scored])
+    lengths = np.array([c.length for c in scored], dtype=float)
+    gc = np.array([100.0 * c.gc for c in scored], dtype=float)
+
+    # Core composition = length-weighted centroid. Long contigs define "self".
+    weights = lengths / lengths.sum()
+    centroid = (tnf * weights[:, None]).sum(axis=0)
+
+    # Correlation distance to the core: scale-free and the standard TNF measure.
+    tc = tnf - tnf.mean(axis=1, keepdims=True)
+    cc = centroid - centroid.mean()
+    denom = np.linalg.norm(tc, axis=1) * np.linalg.norm(cc)
+    corr = np.divide((tc * cc).sum(axis=1), denom, out=np.zeros(len(scored)), where=denom > 0)
+    tnf_distance = 1.0 - corr
+
+    tnf_z = _robust_z(tnf_distance)
+    gc_z = _robust_z(gc)
+
+    # PCA on centred TNF for the bimodality check and for plotting.
+    centred = tnf - tnf.mean(axis=0)
+    try:
+        _u, _s, vt = np.linalg.svd(centred, full_matrices=False)
+        pcs = centred @ vt[:2].T
+    except np.linalg.LinAlgError:  # pragma: no cover - degenerate input
+        pcs = np.zeros((len(scored), 2))
+    labels = _two_means(pcs)
+
+    bin_stats = {}
+    for c in (0, 1):
+        mask = labels == c
+        if mask.any():
+            bin_stats[f"bin{c}"] = {
+                "contigs": int(mask.sum()),
+                "bp": int(lengths[mask].sum()),
+                "bp_fraction_percent": round(100 * float(lengths[mask].sum()) / total_bp, 2),
+                "mean_gc_percent": round(float(np.average(gc[mask], weights=lengths[mask])), 2),
+            }
+    gc_gap = 0.0
+    if "bin0" in bin_stats and "bin1" in bin_stats:
+        gc_gap = abs(bin_stats["bin0"]["mean_gc_percent"] - bin_stats["bin1"]["mean_gc_percent"])
+    minor_fraction = (
+        min(b["bp_fraction_percent"] for b in bin_stats.values()) if len(bin_stats) == 2 else 0.0
+    )
+    bins = {
+        **bin_stats,
+        "gc_gap_percent": round(gc_gap, 2),
+        "minor_bin_fraction_percent": round(minor_fraction, 2),
+        "bimodal": bool(
+            gc_gap >= 3.0
+            and minor_fraction >= 5.0
+            and len(scored) >= min_contigs_for_zscores
+        ),
+    }
+
+    use_zscores = len(scored) >= min_contigs_for_zscores
+    core_gc = float(np.average(gc, weights=lengths))
+
+    verdicts: list[ContigVerdict] = []
+    for i, c in enumerate(scored):
+        flags: list[str] = []
+        if use_zscores:
+            if tnf_z[i] > tnf_z_threshold:
+                flags.append(f"tnf_outlier(z={tnf_z[i]:.1f})")
+            if abs(gc_z[i]) > gc_z_threshold:
+                flags.append(f"gc_outlier(z={gc_z[i]:.1f})")
+        else:
+            if tnf_distance[i] > tnf_distance_threshold:
+                flags.append(f"tnf_divergent(d={tnf_distance[i]:.3f})")
+            if abs(gc[i] - core_gc) > gc_absolute_threshold:
+                flags.append(f"gc_divergent({gc[i] - core_gc:+.1f}pp)")
+        composition_flagged = bool(flags)
+        ndup = dup_per_contig.get(c.name, 0)
+        if ndup >= marker_dup_threshold:
+            flags.append(f"displaced_markers(n={ndup})")
+        if not composition_flagged and ndup >= marker_dup_threshold:
+            # Marker duplication without any compositional support. Real evidence
+            # at genome level, but not grounds for calling this specific contig
+            # foreign -- in a multipartite genome the chromosome and the chromid
+            # legitimately share paralogs of a few core markers.
+            call = "marker_conflict"
+        elif not composition_flagged:
+            call = "core"
+        elif ndup >= marker_dup_threshold:
+            call = "contaminant_candidate"
+        elif c.length >= replicon_min_length:
+            # Big, compositionally distinct, no displaced core markers: plasmid or
+            # chromid is at least as likely as a foreign organism.
+            call = "replicon_candidate"
+            flags.append("distinct_replicon_or_contaminant")
+        else:
+            call = "contaminant_candidate"
+
+        suspicion = (
+            (max(0.0, float(tnf_z[i])) / tnf_z_threshold if use_zscores
+             else float(tnf_distance[i]) / tnf_distance_threshold)
+            + (abs(float(gc_z[i])) / gc_z_threshold if use_zscores
+               else abs(gc[i] - core_gc) / gc_absolute_threshold)
+            + ndup / max(1, marker_dup_threshold)
+        )
+        verdicts.append(
+            ContigVerdict(
+                name=c.name,
+                length=c.length,
+                gc_percent=round(100 * c.gc, 2),
+                tnf_distance=round(float(tnf_distance[i]), 5),
+                tnf_z=round(float(tnf_z[i]), 2) if use_zscores else 0.0,
+                gc_z=round(float(gc_z[i]), 2) if use_zscores else 0.0,
+                duplicated_markers=ndup,
+                bin_label=int(labels[i]),
+                flags=flags,
+                suspicion=round(suspicion, 3),
+                call=call,
+            )
+        )
+
+    suspect = [v for v in verdicts if v.call == "contaminant_candidate"]
+    replicons = [v for v in verdicts if v.call == "replicon_candidate"]
+    suspect_bp = sum(v.length for v in suspect)
+    suspect_fraction = suspect_bp / total_bp if total_bp else 0.0
+
+    n_dup_markers = len(duplicated_marker_contigs)
+    cross_contig_dups = sum(
+        1 for contigs in duplicated_marker_contigs.values() if len(set(contigs)) > 1
+    )
+
+    reasons: list[str] = []
+    if suspect:
+        reasons.append(
+            f"{len(suspect)} contigs ({round(100 * suspect_fraction, 2)}% of assembly) "
+            "deviate from core composition"
+        )
+    if replicons:
+        reasons.append(
+            f"{len(replicons)} large contig(s) ({round(100 * sum(v.length for v in replicons) / total_bp, 2)}% "
+            "of assembly) have distinct composition but carry no displaced core markers -- "
+            "consistent with a plasmid or a second chromosome, not resolvable by composition alone"
+        )
+    if cross_contig_dups:
+        reasons.append(
+            f"{cross_contig_dups} single-copy markers duplicated across different contigs"
+        )
+    if bins["bimodal"]:
+        reasons.append(
+            f"composition is bimodal: minor bin holds {bins['minor_bin_fraction_percent']}% "
+            f"of bases at a {bins['gc_gap_percent']} point GC offset"
+        )
+    if not use_zscores:
+        reasons.append(
+            f"only {len(scored)} contigs scored -- too few for outlier statistics, so "
+            "absolute composition thresholds were used and this verdict is weak evidence"
+        )
+
+    if suspect_fraction > 0.05 or cross_contig_dups >= 5 or (bins["bimodal"] and suspect_fraction > 0.02):
+        verdict = "likely"
+    elif suspect_fraction > 0.01 or cross_contig_dups >= 2 or (bins["bimodal"] and use_zscores):
+        verdict = "possible"
+    else:
+        verdict = "clean"
+        reasons = reasons or ["no compositional outliers and no cross-contig marker duplication"]
+
+    return ContaminationResult(
+        verdict=verdict,
+        reasons=reasons,
+        suspect_bp=suspect_bp,
+        suspect_fraction=suspect_fraction,
+        n_suspect_contigs=len(suspect),
+        contigs=verdicts,
+        bins=bins,
+        params={
+            "min_contig_length": min_contig_length,
+            "zscore_statistics_used": use_zscores,
+            "tnf_z_threshold": tnf_z_threshold,
+            "gc_z_threshold": gc_z_threshold,
+            "tnf_distance_threshold": tnf_distance_threshold,
+            "gc_absolute_threshold": gc_absolute_threshold,
+            "marker_dup_threshold": marker_dup_threshold,
+            "replicon_candidates": [v.name for v in replicons],
+            "contigs_scored": len(scored),
+            "contigs_skipped_short": len(asm.contigs) - len(scored),
+            "duplicated_markers_total": n_dup_markers,
+            "duplicated_markers_cross_contig": cross_contig_dups,
+        },
+    )
+
+
+def write_contig_table(result: ContaminationResult, path: str | Path) -> Path:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    header = [
+        "contig", "length", "gc_percent", "tnf_distance", "tnf_z", "gc_z",
+        "displaced_markers", "bin", "call", "suspicion", "flags",
+    ]
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\t".join(header) + "\n")
+        for c in sorted(result.contigs, key=lambda x: -x.suspicion):
+            fh.write(
+                "\t".join(
+                    [
+                        c.name, str(c.length), f"{c.gc_percent}", f"{c.tnf_distance}",
+                        f"{c.tnf_z}", f"{c.gc_z}", str(c.duplicated_markers),
+                        str(c.bin_label), c.call, f"{c.suspicion}", ";".join(c.flags) or "-",
+                    ]
+                )
+                + "\n"
+            )
+    return path

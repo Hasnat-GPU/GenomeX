@@ -1,0 +1,20 @@
+name: Feature or organism support
+description: Propose a capability, a new lineage, or a different organism class
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What question can you not currently answer?
+      description: Describe the analysis, not the implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: How would a reader know the answer is right?
+      description: >
+        Every GenomeX claim ships with its evidence and, where a pattern could
+        arise by chance, a null model. What would this one ship with?
+    validations:
+      required: true

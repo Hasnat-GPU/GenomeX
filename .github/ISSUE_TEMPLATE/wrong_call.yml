@@ -1,0 +1,51 @@
+name: Wrong biological call
+description: GenomeX reported something about a genome that is demonstrably wrong
+labels: ["correctness"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most valuable issue type in the project. The thresholds were
+        set against four genomes and a synthetic fixture — a sample of four.
+  - type: dropdown
+    id: which
+    attributes:
+      label: Which call is wrong?
+      options:
+        - Completeness / marker recovery
+        - Contamination verdict
+        - replicon_candidate vs contaminant_candidate
+        - ANI or species boundary
+        - Strain-unique gene explanation / island enrichment
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: accession
+    attributes:
+      label: Genome accession or how to obtain the input
+      placeholder: "GCF_000020045.1, or a link to the assembly"
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command you ran
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: What GenomeX reported
+      description: Paste the relevant part of genomex.json or contigs.tsv.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What the right answer is, and how you know
+      description: A reference tool's output, a publication, or curated annotation.
+    validations:
+      required: true
