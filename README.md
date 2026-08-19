@@ -183,13 +183,18 @@ Alpha, but no longer uncalibrated. Completeness and duplication now match BUSCO
 exactly on every marker of the demo set, and that comparison is reproducible
 from `bench/`.
 
-**The contamination verdict does not currently work on real drafts**, and that is
-measured, not suspected. Against CheckM2 over 72 published assemblies it flags 62
-while CheckM2 puts 4 above 5% contamination, and its median CheckM2 contamination
-is flat across all three verdict levels — see
-[`docs/benchmark-contamination.md`](docs/benchmark-contamination.md). Use the
-per-contig evidence in `contigs.tsv`; do not rely on the headline verdict until
-this is fixed.
+**The contamination module locates compositionally distinct sequence; it does not
+estimate a contamination percentage.** It was rebuilt after the first CheckM2
+comparison showed it flagging 62 of 72 published assemblies. Scoring is now
+conditioned on contig length against a null built from the assembly's own
+sequence, and it flags 13 of 72 with verdict levels that track CheckM2
+monotonically. That cost recall: three genomes CheckM2 puts above 5% are called
+clean, because 124 single-copy markers quantise contamination in steps of 0.81%
+and cannot resolve 5%. Both numbers, and why, are in
+[`docs/benchmark-contamination.md`](docs/benchmark-contamination.md).
+
+Read `contigs.tsv` and the replicon groups. Do not substitute the verdict for
+CheckM2 or CheckM if you need a MIMAG-style contamination percentage.
 
 The same comparison verified what does work: genome size, contig count, GC, N50,
 CDS count and coding density agree with CheckM2 exactly across all 72 genomes,

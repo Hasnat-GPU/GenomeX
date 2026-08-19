@@ -97,9 +97,20 @@ makes and you must preserve when reporting:
   markers. In multipartite genomes (Paraburkholderia, Cupriavidus, Vibrio) this is
   usually a plasmid or a second chromosome. Composition cannot separate a
   megaplasmid from a contaminant; say so rather than picking one.
-- `undetermined` — fewer than 8 scored contigs, so no outlier statistics are
-  possible. A finished 3-replicon genome lands here. Report per-replicon
-  composition instead of a verdict.
+- `undetermined` — too little sequence to build a within-genome null. Report
+  per-contig composition instead of a verdict.
+
+**The verdict is not a contamination percentage and must never be reported as
+one.** It locates compositionally distinct sequence. Against CheckM2 over 72
+published assemblies it flags 13 with verdict levels that track CheckM2's
+percentage monotonically, but it calls three genomes clean that CheckM2 puts
+above 5%: 124 single-copy markers quantise contamination in steps of 0.81%, so
+5% is below what marker duplication can resolve. If a user needs a MIMAG-style
+percentage, tell them to run CheckM2 or CheckM — do not substitute this.
+
+Scoring is conditioned on contig length, so the verdict no longer moves when an
+assembly is more fragmented; `params.fwer_z_threshold` records the cutoff and
+`params.null_curve` the calibration it came from.
 
 **ANI**. ≥95% is the operational species boundary. `null` means fastANI found too
 little to align (below roughly 80% identity) — that means *distant*, not

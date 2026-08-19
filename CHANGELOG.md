@@ -6,6 +6,44 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Contamination scoring is now conditioned on contig length.** A
+  tetranucleotide frequency is a multinomial sample whose divergence falls as
+  1/length, so one threshold for a 3 kb contig and a 4 Mb chromosome flagged the
+  short tail of every fragmented assembly. Each contig is scored against a null
+  built from windows of its own length tiled inside the assembly's own contigs;
+  the measured slope of log divergence against log window is −0.58 to −0.72,
+  not the −1.0 sampling alone predicts, so the curve is measured rather than
+  assumed.
+- The fixed z of 4.0 is now a Bonferroni cutoff at α = 0.05, stated as an error
+  rate and moving with the number of contigs tested.
+- Bimodality no longer contributes to the verdict. It fired on 57 of 72 published
+  genomes because a 2-means split always returns two bins. Retained as evidence.
+- Flagged contigs are grouped into candidate replicons before judgement, so a
+  plasmid is one object whether emitted as one 785 kb contig or thirty 27 kb ones.
+- The replicon call rests on positive evidence: a group carrying the single-copy
+  core at the genome-wide rate is another organism's chromosome; one carrying none
+  is extrachromosomal. With no marker scan supplied, no plasmid claim is made.
+
+  Measured on `bench/fragmentation_ladder.py`, which is constructed ground truth
+  independent of CheckM2: 13 of 15 rungs clean, against 2 of 15 before, and
+  corr(contig score, log length) from −0.43 to −0.09. Out of sample against
+  CheckM2: 13 of 72 flagged where 62 were before, verdict medians monotone
+  (0.93 / 1.23 / 2.13) where they had been flat and faintly inverted, and recall
+  at CheckM2 ≥ 5% down from 1.00 to 0.25. The recall loss is reported alongside
+  the precision gain because reporting either alone would misrepresent the change.
+
+### Added
+
+- `bench/fragmentation_ladder.py` — shreds a finished genome to 10/50/100/300/1000
+  contigs and asserts the verdict does not move. Development ran against this
+  rather than against the CheckM2 numbers, so no threshold is fitted to the
+  benchmark it is later measured on.
+- `genomex/composition.py` — length-conditioned scoring, the within-genome window
+  null, and the recorded refutations of four alternative nulls and three classical
+  unimodality statistics that were considered and measured.
+
 ## [0.1.1] - 2026-08-18
 
 ### Fixed

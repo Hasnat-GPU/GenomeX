@@ -57,8 +57,9 @@ Read this before repeating any number to a user.
 | Completeness vs CheckM2 residual | explained: tracks fragmented count at r = −0.996 |
 | ANI, orthogroups, core/accessory | unvalidated against a reference, but thin wrappers over fastANI/MMseqs2 |
 | Genomic island calls | guarded by a permutation null; only trust when `informative` is true |
-| **Contamination verdict** | **refuted** — flags 62/72 published assemblies CheckM2 calls clean. Do not rely on it; use `contigs.tsv` |
-| replicon vs contaminant split | unvalidated, no reference implementation exists |
+| Contamination verdict | **rebuilt after refutation** — 13/72 flagged (was 62), verdict levels track CheckM2 monotonically, but recall at CheckM2 ≥5% is 0.25. Locates distinct sequence; is not a contamination percentage |
+| Fragmentation invariance | 13/15 ladder rungs clean (was 2/15); corr(score, log length) −0.09 (was −0.43) |
+| replicon vs contaminant split | rests on core-marker rate; genuinely ambiguous without coverage depth |
 
 ## Environment gotchas that have cost real time
 
