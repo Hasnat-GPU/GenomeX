@@ -116,6 +116,8 @@ def analyze_genome(
     contamination = detect_contamination(
         asm,
         duplicated_marker_contigs=markers.duplicated_marker_contigs(),
+        contig_marker_counts=markers.contig_marker_counts(),
+        total_markers=markers.n_markers,
         min_contig_length=min_contig_length,
     )
     write_contig_table(contamination, outdir / "contigs.tsv")

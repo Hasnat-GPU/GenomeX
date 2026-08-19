@@ -22,11 +22,24 @@ the verdict while still trusting the evidence.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 
+from .composition import (
+    N_CANON,
+    NullCurve,
+    base_tiles,
+    chi2_divergence,
+    counts_from_codes,
+    frequencies,
+    fwer_threshold,
+    gc_percent_from_freq,
+    kmer_codes,
+    null_curve,
+)
 from .fasta import Assembly, Contig
 
 # 4-mers: 256 raw, 136 canonical after merging each with its reverse complement.
@@ -178,6 +191,8 @@ def detect_contamination(
     asm: Assembly,
     *,
     duplicated_marker_contigs: dict[str, list[str]] | None = None,
+    contig_marker_counts: dict[str, int] | None = None,
+    total_markers: int | None = None,
     min_contig_length: int = 3000,
     tnf_z_threshold: float = 4.0,
     gc_z_threshold: float = 4.0,
@@ -186,6 +201,7 @@ def detect_contamination(
     tnf_distance_threshold: float = 0.02,
     gc_absolute_threshold: float = 5.0,
     replicon_min_length: int = 50_000,
+    alpha: float = 0.05,
 ) -> ContaminationResult:
     """Score every contig, then combine per-contig evidence into one verdict.
 
@@ -230,7 +246,15 @@ def detect_contamination(
             params={"min_contig_length": min_contig_length},
         )
 
-    tnf = np.vstack([tetranucleotide_freq(c.seq) for c in scored])
+    # Length-conditioned scoring. Every contig is scored against a null built
+    # from windows of its own length tiled inside this assembly, so a 3 kb contig
+    # is compared with native 3 kb sequence rather than with a 4 Mb chromosome.
+    codes = [kmer_codes(c.seq) for c in scored]
+    tile_sets = [base_tiles(cd) for cd in codes]
+    totals = [counts_from_codes(cd) for cd in codes]
+    curve = null_curve(tile_sets, totals)
+
+    tnf = np.vstack([frequencies(t) for t in totals])
     lengths = np.array([c.length for c in scored], dtype=float)
     gc = np.array([100.0 * c.gc for c in scored], dtype=float)
 
@@ -245,8 +269,47 @@ def detect_contamination(
     corr = np.divide((tc * cc).sum(axis=1), denom, out=np.zeros(len(scored)), where=denom > 0)
     tnf_distance = 1.0 - corr
 
-    tnf_z = _robust_z(tnf_distance)
-    gc_z = _robust_z(gc)
+    # Divergence of each contig from the assembly excluding itself, standardised
+    # by what native sequence of that length does. `_robust_z` is kept for the
+    # degenerate case where a genome cannot supply enough windows for a curve.
+    def _score(exclude: set[int]) -> tuple[np.ndarray, np.ndarray, np.ndarray, NullCurve]:
+        """Score every contig against the assembly with `exclude` held out.
+
+        Held-out contigs are still scored -- they are simply not allowed to define
+        what native looks like. Both the reference composition and the null curve
+        exclude them, because a contaminant that contributes to its own reference
+        hides, and one that contributes to the null widens it for everyone.
+        """
+        keep = [i for i in range(len(scored)) if i not in exclude]
+        ref_pool = np.sum([totals[i] for i in keep], axis=0) if keep else np.sum(totals, axis=0)
+        curve_ = null_curve(
+            [tile_sets[i] for i in keep], [totals[i] for i in keep]
+        ) if keep else curve0
+        chi2_ = np.zeros(len(scored))
+        tnf_z_ = np.zeros(len(scored))
+        gc_z_ = np.zeros(len(scored))
+        for i, c in enumerate(scored):
+            # Leave-one-out only for contigs still inside the reference pool.
+            ref_counts = ref_pool - totals[i] if i in keep else ref_pool
+            ref = frequencies(ref_counts) if ref_counts.sum() > 0 else centroid
+            chi2_[i] = chi2_divergence(tnf[i], ref)
+            mu_i, sd_i = curve_.at(c.length)
+            tnf_z_[i] = (math.log(chi2_[i]) - mu_i) / sd_i if chi2_[i] > 0 else 0.0
+            gc_z_[i] = (gc[i] - gc_percent_from_freq(ref)) / curve_.gc_sigma_at(c.length)
+        return chi2_, tnf_z_, gc_z_, curve_
+
+    curve0 = curve
+    chi2, tnf_z, gc_z, curve = _score(set())
+
+    # One refit, deterministic, no convergence loop. The first pass is computed
+    # against a reference that includes whatever foreign sequence is present; at
+    # appreciable contamination that drags the reference toward the contaminant
+    # and makes the host look divergent. Re-scoring against the survivors fixes it.
+    first_pass_z = fwer_threshold(len(scored), alpha=alpha)
+    outliers = {i for i in range(len(scored)) if tnf_z[i] > first_pass_z}
+    refit_applied = bool(outliers) and len(outliers) < len(scored) - 1
+    if refit_applied:
+        chi2, tnf_z, gc_z, curve = _score(outliers)
 
     # PCA on centred TNF for the bimodality check and for plotting.
     centred = tnf - tnf.mean(axis=0)
@@ -284,26 +347,94 @@ def detect_contamination(
         ),
     }
 
-    use_zscores = len(scored) >= min_contigs_for_zscores
+    # One cutoff, stated as an error rate rather than a constant. A fixed z of 4.0
+    # meant a different family-wise error rate on a 3-contig genome than on a
+    # 1243-contig one, so the same assembly shredded finer was held to a laxer
+    # standard per contig and a stricter one overall.
+    z_star = fwer_threshold(len(scored), alpha=alpha)
+    use_zscores = not curve.theoretical
     core_gc = float(np.average(gc, weights=lengths))
+
+    # Group compositionally flagged contigs into candidate replicons before
+    # judging them. A plasmid is one biological object whether the assembler
+    # emitted it as a single 785 kb contig or as thirty 27 kb ones, so the
+    # replicon test has to be applied to the group's mass, not to each fragment's
+    # length. Judging per contig meant that shredding a megaplasmid turned one
+    # `replicon_candidate` into thirty `contaminant_candidate`s -- fragmentation
+    # changing the biology.
+    #
+    # Two flagged contigs join the same group when they diverge from each other
+    # no more than native sequence of their lengths does, measured against the
+    # same null curve used for everything else.
+    flagged_idx = [
+        i for i in range(len(scored))
+        if tnf_z[i] > z_star or abs(gc_z[i]) > z_star
+    ]
+    parent: dict[int, int] = {i: i for i in flagged_idx}
+
+    def _find(a: int) -> int:
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    for ai, i in enumerate(flagged_idx):
+        for j in flagged_idx[ai + 1:]:
+            shorter = min(scored[i].length, scored[j].length)
+            mu_ij, sd_ij = curve.at(shorter)
+            d_ij = chi2_divergence(tnf[i], tnf[j])
+            if d_ij <= 0:
+                z_ij = -math.inf
+            else:
+                z_ij = (math.log(d_ij) - mu_ij) / sd_ij
+            if z_ij <= z_star:
+                ri, rj = _find(i), _find(j)
+                if ri != rj:
+                    parent[ri] = rj
+
+    groups: dict[int, list[int]] = {}
+    for i in flagged_idx:
+        groups.setdefault(_find(i), []).append(i)
+    group_bp = {root: sum(scored[i].length for i in members) for root, members in groups.items()}
+    group_dups = {
+        root: sum(dup_per_contig.get(scored[i].name, 0) for i in members)
+        for root, members in groups.items()
+    }
+    group_of = {i: _find(i) for i in flagged_idx}
+
+    # Expected core markers per base, used to ask whether a flagged group looks
+    # like chromosomal sequence or like an extrachromosomal element.
+    # The rate is estimated from markers actually located on contigs, never from
+    # the lineage size: if a scan found nothing, there is no rate, and "carries no
+    # markers" then says nothing about whether a group is extrachromosomal.
+    marker_rate: float | None = None
+    if contig_marker_counts:
+        observed_total = sum(contig_marker_counts.values())
+        if observed_total and total_bp:
+            marker_rate = observed_total / total_bp
+    group_carries_markers: dict[int, bool] = {}
+    for root, members in groups.items():
+        observed = sum(contig_marker_counts.get(scored[i].name, 0) for i in members)             if contig_marker_counts else 0
+        if marker_rate is None:
+            group_carries_markers[root] = False
+            continue
+        expected = marker_rate * sum(scored[i].length for i in members)
+        group_carries_markers[root] = observed >= max(1.0, 0.5 * expected)
 
     verdicts: list[ContigVerdict] = []
     for i, c in enumerate(scored):
         flags: list[str] = []
-        if use_zscores:
-            if tnf_z[i] > tnf_z_threshold:
-                flags.append(f"tnf_outlier(z={tnf_z[i]:.1f})")
-            if abs(gc_z[i]) > gc_z_threshold:
-                flags.append(f"gc_outlier(z={gc_z[i]:.1f})")
-        else:
-            if tnf_distance[i] > tnf_distance_threshold:
-                flags.append(f"tnf_divergent(d={tnf_distance[i]:.3f})")
-            if abs(gc[i] - core_gc) > gc_absolute_threshold:
-                flags.append(f"gc_divergent({gc[i] - core_gc:+.1f}pp)")
+        if tnf_z[i] > z_star:
+            flags.append(f"composition_outlier(z={tnf_z[i]:.1f})")
+        if abs(gc_z[i]) > z_star:
+            flags.append(f"gc_outlier(z={gc_z[i]:.1f})")
         composition_flagged = bool(flags)
         ndup = dup_per_contig.get(c.name, 0)
         if ndup >= marker_dup_threshold:
             flags.append(f"displaced_markers(n={ndup})")
+        root = group_of.get(i)
+        group_mass = group_bp.get(root, 0) if root is not None else 0
+        group_dup = group_dups.get(root, 0) if root is not None else 0
         if not composition_flagged and ndup >= marker_dup_threshold:
             # Marker duplication without any compositional support. Real evidence
             # at genome level, but not grounds for calling this specific contig
@@ -312,21 +443,37 @@ def detect_contamination(
             call = "marker_conflict"
         elif not composition_flagged:
             call = "core"
-        elif ndup >= marker_dup_threshold:
+        elif group_dup >= marker_dup_threshold:
             call = "contaminant_candidate"
-        elif c.length >= replicon_min_length:
-            # Big, compositionally distinct, no displaced core markers: plasmid or
-            # chromid is at least as likely as a foreign organism.
+        elif group_carries_markers.get(root, False):
+            # Carries core single-copy markers at something like the genome-wide
+            # rate, so it is chromosomal sequence -- and chromosomal sequence with
+            # foreign composition is a second organism, not a plasmid. Plasmids
+            # and chromids do not carry the universal single-copy core.
+            call = "contaminant_candidate"
+            flags.append("carries_core_markers")
+        elif marker_rate is None:
+            # No marker scan was supplied, so "carries no core markers" is not a
+            # fact about this group, merely an absence of evidence. Report the
+            # anomaly rather than explaining it away as a plasmid.
+            call = "contaminant_candidate"
+        elif group_mass >= replicon_min_length:
+            # A compositionally coherent group of this mass, carrying no displaced
+            # core markers, is as likely a plasmid or chromid as a foreign
+            # organism. Mass is measured over the group, so the call survives
+            # fragmentation.
             call = "replicon_candidate"
-            flags.append("distinct_replicon_or_contaminant")
+            n_frag = len(groups.get(root, []))
+            flags.append(
+                "distinct_replicon_or_contaminant"
+                + (f"(group={n_frag} contigs, {group_mass // 1000} kb)" if n_frag > 1 else "")
+            )
         else:
             call = "contaminant_candidate"
 
         suspicion = (
-            (max(0.0, float(tnf_z[i])) / tnf_z_threshold if use_zscores
-             else float(tnf_distance[i]) / tnf_distance_threshold)
-            + (abs(float(gc_z[i])) / gc_z_threshold if use_zscores
-               else abs(gc[i] - core_gc) / gc_absolute_threshold)
+            max(0.0, float(tnf_z[i])) / z_star
+            + abs(float(gc_z[i])) / z_star
             + ndup / max(1, marker_dup_threshold)
         )
         verdicts.append(
@@ -335,8 +482,8 @@ def detect_contamination(
                 length=c.length,
                 gc_percent=round(100 * c.gc, 2),
                 tnf_distance=round(float(tnf_distance[i]), 5),
-                tnf_z=round(float(tnf_z[i]), 2) if use_zscores else 0.0,
-                gc_z=round(float(gc_z[i]), 2) if use_zscores else 0.0,
+                tnf_z=round(float(tnf_z[i]), 2),
+                gc_z=round(float(gc_z[i]), 2),
                 duplicated_markers=ndup,
                 bin_label=int(labels[i]),
                 flags=flags,
@@ -382,9 +529,13 @@ def detect_contamination(
             "absolute composition thresholds were used and this verdict is weak evidence"
         )
 
-    if suspect_fraction > 0.05 or cross_contig_dups >= 5 or (bins["bimodal"] and suspect_fraction > 0.02):
+    # The bimodality field no longer votes. A 2-means split always returns two
+    # bins, so on any fragmented assembly some split cleared the old thresholds;
+    # it fired on 57 of 72 published genomes CheckM2 calls clean. It is retained
+    # as reported evidence, not as a trigger.
+    if suspect_fraction > 0.05 or cross_contig_dups >= 5:
         verdict = "likely"
-    elif suspect_fraction > 0.01 or cross_contig_dups >= 2 or (bins["bimodal"] and use_zscores):
+    elif suspect_fraction > 0.01 or cross_contig_dups >= 2:
         verdict = "possible"
     else:
         verdict = "clean"
@@ -401,6 +552,13 @@ def detect_contamination(
         params={
             "min_contig_length": min_contig_length,
             "zscore_statistics_used": use_zscores,
+            "alpha": alpha,
+            "fwer_z_threshold": round(z_star, 3),
+            "null_curve": curve.summary(),
+            "flagged_groups": len(groups),
+            "marker_rate_per_mb": round(1e6 * marker_rate, 2) if marker_rate else None,
+            "refit_applied": refit_applied,
+            "refit_excluded_contigs": len(outliers) if refit_applied else 0,
             "tnf_z_threshold": tnf_z_threshold,
             "gc_z_threshold": gc_z_threshold,
             "tnf_distance_threshold": tnf_distance_threshold,

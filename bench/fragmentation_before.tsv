@@ -1,0 +1,16 @@
+genome	requested_pieces	scored_contigs	verdict	suspect_contigs	suspect_fraction_pct	bimodal	mean_contig_kb
+GCA_000300095.1	10	10	possible	0	0.0	True	765.1
+GCA_000300095.1	50	47	possible	2	0.27	True	153.0
+GCA_000300095.1	100	97	likely	11	3.34	True	77.3
+GCA_000300095.1	300	264	likely	25	5.17	True	25.5
+GCA_000300095.1	1000	694	likely	63	6.51	True	7.6
+GCF_000020045.1	10	10	possible	1	0.37	True	867.7
+GCF_000020045.1	50	48	clean	1	0.12	False	173.5
+GCF_000020045.1	100	98	possible	5	0.64	True	86.8
+GCF_000020045.1	300	276	likely	23	3.71	True	28.9
+GCF_000020045.1	1000	720	likely	50	5.21	True	8.7
+GCA_000069785.1	10	10	possible	0	0.0	True	647.7
+GCA_000069785.1	50	47	possible	6	0.78	True	132.2
+GCA_000069785.1	100	99	likely	13	2.8	True	64.1
+GCA_000069785.1	300	259	likely	32	8.98	True	21.6
+GCA_000069785.1	1000	631	likely	68	8.79	True	6.5

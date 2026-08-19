@@ -127,20 +127,65 @@ def test_marker_duplication_alone_does_not_condemn_a_contig(tmp_path):
     assert set(result.summary()["marker_conflict_contigs"]) == {names[0], names[1]}
 
 
-def test_large_distinct_contig_without_displaced_markers_is_called_a_replicon(tmp_path):
-    """The megaplasmid case: distinct composition, but no evidence of a second organism."""
+def test_distinct_sequence_without_core_markers_is_called_a_replicon(tmp_path):
+    """The megaplasmid case: distinct composition, and positive evidence it is not
+    a second organism -- the rest of the assembly carries the single-copy core and
+    this sequence carries none of it. Plasmids and chromids do not carry the
+    universal core; a foreign genome fragment does."""
     genome = contaminated_genome(
         name="plasmid", n_host=12, n_foreign=1, contig_len=60_000,
         host_gc=0.63, foreign_gc=0.52, seed=13,
     )
-    result = detect_contamination(_load(tmp_path, genome))
+    asm = _load(tmp_path, genome)
     planted = next(iter(genome.foreign_contigs))
+    # Core markers spread over the host contigs, none on the distinct sequence.
+    host_contigs = [c.name for c in asm.contigs if c.name != planted]
+    marker_counts = {name: 10 for name in host_contigs}
+
+    result = detect_contamination(asm, contig_marker_counts=marker_counts)
     call = {c.name: c.call for c in result.contigs}[planted]
 
     assert call == "replicon_candidate"
     assert planted not in result.suspect_contig_names()
     assert planted in result.flagged_contig_names()
     assert any("plasmid" in r for r in result.reasons)
+
+
+def test_without_a_marker_scan_no_plasmid_claim_is_made(tmp_path):
+    """Absence of evidence is not evidence of absence.
+
+    The same sequence, with no marker information supplied, must be reported as a
+    contaminant candidate rather than explained away as a plasmid -- the plasmid
+    reading rests on knowing the core markers are elsewhere, which an unscanned
+    assembly cannot establish."""
+    genome = contaminated_genome(
+        name="plasmid", n_host=12, n_foreign=1, contig_len=60_000,
+        host_gc=0.63, foreign_gc=0.52, seed=13,
+    )
+    asm = _load(tmp_path, genome)
+    planted = next(iter(genome.foreign_contigs))
+
+    result = detect_contamination(asm)
+    assert {c.name: c.call for c in result.contigs}[planted] == "contaminant_candidate"
+    assert planted in result.suspect_contig_names()
+
+
+def test_foreign_sequence_carrying_core_markers_is_a_second_organism(tmp_path):
+    """A compositionally distinct group that carries the single-copy core at the
+    genome-wide rate is chromosomal sequence from another organism, and mass must
+    not buy it a plasmid reading however large it is."""
+    genome = contaminated_genome(
+        name="organism", n_host=12, n_foreign=3, contig_len=60_000,
+        host_gc=0.63, foreign_gc=0.52, seed=13,
+    )
+    asm = _load(tmp_path, genome)
+    marker_counts = {c.name: 10 for c in asm.contigs}  # core spread everywhere
+
+    result = detect_contamination(asm, contig_marker_counts=marker_counts)
+    calls = {c.name: c.call for c in result.contigs}
+    for planted in genome.foreign_contigs:
+        assert calls[planted] == "contaminant_candidate", planted
+    assert genome.foreign_contigs <= result.suspect_contig_names()
 
 
 def test_too_few_contigs_returns_undetermined_not_a_guess(tmp_path):
