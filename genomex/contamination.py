@@ -611,11 +611,13 @@ def detect_contamination(
             "duplicated_markers_total": n_dup_markers,
             "duplicated_markers_cross_contig": cross_contig_dups,
             "marker_set_size": total_markers,
-            # Share of the single-copy core sitting on more than one contig. Under
-            # a two-genome mixture this tracks the minor genome's mass fraction,
-            # which is what makes it comparable across marker sets. It is not a
-            # contamination percentage: cross-replicon paralogy contributes to it
-            # too, at roughly 1% in the finished genomes measured here.
+            # Share of the single-copy core sitting on more than one contig.
+            # Rises with the foreign fraction and is comparable across marker
+            # sets, which is what the verdict needs. It is emphatically not a
+            # contamination percentage: on `bench/mixture_ladder.py` a 5%
+            # mixture produced 4.8-11.6% here, and clean finished genomes sit
+            # near 1% from ordinary cross-replicon paralogy alone. Report the
+            # verdict, not this number.
             "cross_contig_duplication_percent": (
                 round(100 * dup_rate, 2) if dup_rate is not None else None
             ),
