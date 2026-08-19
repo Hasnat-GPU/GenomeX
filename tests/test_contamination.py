@@ -212,3 +212,55 @@ def test_verdict_is_deterministic_across_runs(tmp_path):
     assert a.verdict == b.verdict
     assert [c.suspicion for c in a.contigs] == [c.suspicion for c in b.contigs]
     assert a.bins == b.bins
+
+
+# --------------------------------------------- marker-set scale invariance
+
+def test_duplication_verdict_is_a_rate_not_a_count(tmp_path):
+    """The same genome scanned with a bigger marker set must not get a worse verdict.
+
+    Swapping bacteria_odb10 (124 markers) for burkholderiales_odb10 (688)
+    multiplies every duplication count by 5.5 without adding one base of
+    contamination. Under the old absolute cutoffs that turned finished reference
+    genomes -- carrying an ordinary ~1% of cross-replicon paralogs -- into
+    `likely` contamination.
+    """
+    genome = clean_genome(seed=5)
+    asm = _load(tmp_path, genome)
+    names = [c.name for c in asm.contigs]
+
+    # 1% of each set duplicated across two contigs: the same biology, twice.
+    small = {f"busco{i}": [names[0], names[1]] for i in range(1)}
+    large = {f"busco{i}": [names[0], names[1]] for i in range(7)}
+
+    assert detect_contamination(asm, duplicated_marker_contigs=small,
+                                total_markers=124).verdict == "clean"
+    assert detect_contamination(asm, duplicated_marker_contigs=large,
+                                total_markers=688).verdict == "clean"
+
+
+def test_duplication_rate_above_threshold_still_fires(tmp_path):
+    """Scale invariance must not be bought by going blind: 5% of a large set is
+    contamination just as 5% of a small one is."""
+    genome = clean_genome(seed=5)
+    asm = _load(tmp_path, genome)
+    names = [c.name for c in asm.contigs]
+    dup = {f"busco{i}": [names[0], names[1]] for i in range(40)}  # 5.8% of 688
+
+    result = detect_contamination(asm, duplicated_marker_contigs=dup, total_markers=688)
+    assert result.verdict == "likely"
+    assert result.params["cross_contig_duplication_percent"] == pytest.approx(5.81, abs=0.01)
+
+
+def test_unknown_marker_set_falls_back_to_counts(tmp_path):
+    """No denominator means no rate. Falling back to the previous absolute rule is
+    honest; inventing a marker-set size would not be."""
+    genome = clean_genome(seed=5)
+    asm = _load(tmp_path, genome)
+    names = [c.name for c in asm.contigs]
+    dup = {f"busco{i}": [names[0], names[1]] for i in range(5)}
+
+    result = detect_contamination(asm, duplicated_marker_contigs=dup)
+    assert result.verdict == "likely"
+    assert result.params["cross_contig_duplication_percent"] is None
+    assert result.params["marker_set_size"] is None

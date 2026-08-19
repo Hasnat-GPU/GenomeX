@@ -69,6 +69,26 @@ for _i in range(4**K):
         _CANON_GROUP[_key] = len(_canon_order)
         _canon_order.append(_key)
 N_CANON = len(_canon_order)  # 136
+
+#: Marker count of `bacteria_odb10`, the set the duplication cutoffs below were
+#: originally written against.
+_REFERENCE_MARKER_SET = 124
+
+#: Verdict cutoffs on the *rate* of cross-contig marker duplication, not on its
+#: count. A mixture holding a foreign genome at mass fraction f displaces roughly
+#: f x N of the N single-copy markers onto foreign contigs, so the rate estimates
+#: f and does not depend on N; the raw count scales with the marker set and means
+#: nothing on its own.
+#:
+#: Counting is what a lineage-specific set breaks. Swapping bacteria_odb10 (124
+#: markers) for burkholderiales_odb10 (688) multiplies every count by 5.5 without
+#: adding one base of contamination, and finished reference genomes carrying an
+#: ordinary 1% of cross-replicon paralogs jumped straight to `likely`.
+#:
+#: The two values are the previous cutoffs of 5 and 2 divided by 124. That is a
+#: change of units, not a retuning: on bacteria_odb10 the rule is unchanged.
+DUP_RATE_LIKELY = 5 / _REFERENCE_MARKER_SET      # 4.03%
+DUP_RATE_POSSIBLE = 2 / _REFERENCE_MARKER_SET    # 1.61%
 _RAW_TO_CANON = np.array(
     [_CANON_GROUP[min(i, _revcomp_index(i))] for i in range(4**K)], dtype=np.int32
 )
@@ -515,8 +535,13 @@ def detect_contamination(
             "consistent with a plasmid or a second chromosome, not resolvable by composition alone"
         )
     if cross_contig_dups:
+        share = (
+            f" ({round(100 * cross_contig_dups / total_markers, 2)}% of the "
+            f"{total_markers}-marker set)" if total_markers else ""
+        )
         reasons.append(
-            f"{cross_contig_dups} single-copy markers duplicated across different contigs"
+            f"{cross_contig_dups} single-copy markers duplicated across "
+            f"different contigs{share}"
         )
     if bins["bimodal"]:
         reasons.append(
@@ -533,9 +558,25 @@ def detect_contamination(
     # bins, so on any fragmented assembly some split cleared the old thresholds;
     # it fired on 57 of 72 published genomes CheckM2 calls clean. It is retained
     # as reported evidence, not as a trigger.
-    if suspect_fraction > 0.05 or cross_contig_dups >= 5:
+    # Duplication is judged as a rate when the marker-set size is known, and as a
+    # raw count when it is not. A caller that cannot say how many markers were
+    # searched has not supplied enough information to form a rate, and inventing
+    # a denominator would be worse than falling back to the older, set-specific
+    # behaviour -- which the fallback reproduces exactly on bacteria_odb10.
+    if total_markers:
+        dup_rate = cross_contig_dups / total_markers
+        # `>=`, so that on a 124-marker set the rule is bit-for-bit the old one:
+        # 5/124 >= 5/124 must hold, or the change of units quietly moves the line.
+        dup_likely = dup_rate >= DUP_RATE_LIKELY
+        dup_possible = dup_rate >= DUP_RATE_POSSIBLE
+    else:
+        dup_rate = None
+        dup_likely = cross_contig_dups >= 5
+        dup_possible = cross_contig_dups >= 2
+
+    if suspect_fraction > 0.05 or dup_likely:
         verdict = "likely"
-    elif suspect_fraction > 0.01 or cross_contig_dups >= 2:
+    elif suspect_fraction > 0.01 or dup_possible:
         verdict = "possible"
     else:
         verdict = "clean"
@@ -569,6 +610,18 @@ def detect_contamination(
             "contigs_skipped_short": len(asm.contigs) - len(scored),
             "duplicated_markers_total": n_dup_markers,
             "duplicated_markers_cross_contig": cross_contig_dups,
+            "marker_set_size": total_markers,
+            # Share of the single-copy core sitting on more than one contig. Under
+            # a two-genome mixture this tracks the minor genome's mass fraction,
+            # which is what makes it comparable across marker sets. It is not a
+            # contamination percentage: cross-replicon paralogy contributes to it
+            # too, at roughly 1% in the finished genomes measured here.
+            "cross_contig_duplication_percent": (
+                round(100 * dup_rate, 2) if dup_rate is not None else None
+            ),
+            "duplication_rate_thresholds_percent": [
+                round(100 * DUP_RATE_POSSIBLE, 2), round(100 * DUP_RATE_LIKELY, 2)
+            ],
         },
     )
 
