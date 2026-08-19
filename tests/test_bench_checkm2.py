@@ -82,3 +82,47 @@ def test_missing_columns_do_not_crash_the_comparison(tmp_path):
     pairs = bench.stat_pairs(GX, cm)
     assert pairs["genome_size"][1] is None
     assert math.isnan(bench.relative_gap(*pairs["genome_size"]))
+
+
+# --------------------------------------------------- end-to-end page build
+
+def _genomex_json(tmp_path, genomes: list[dict]) -> Path:
+    import json
+    d = tmp_path / "gx"
+    d.mkdir()
+    (d / "genomex.json").write_text(json.dumps({"genomes": genomes}), encoding="utf-8")
+    return d
+
+
+def _gx_entry(name: str, lineage: str | None = None, n_markers: int | None = None) -> dict:
+    import copy
+    g = copy.deepcopy(GX)
+    g["genome"] = name
+    if lineage:
+        g["markers"]["lineage"] = lineage
+        g["markers"]["markers_total"] = n_markers
+    return g
+
+
+def test_report_names_the_marker_set_it_used(tmp_path):
+    """A contamination result quoted without its lineage cannot be compared to
+    another one: 124 markers quantise at 0.81%, 688 at 0.15%."""
+    gx = _genomex_json(tmp_path, [_gx_entry("g1", "burkholderiales_odb10", 688)])
+    cm = _report(tmp_path, ["g1\t100.0\t0.5\t0.88\t4152217\t7650000\t63.5\t6771\t3"])
+    out = tmp_path / "page.md"
+
+    assert bench.main(["--genomex", str(gx), "--checkm2", str(cm), "--out", str(out)]) == 0
+    text = out.read_text(encoding="utf-8")
+    assert "burkholderiales_odb10" in text
+    assert "688 markers" in text
+
+
+def test_report_builds_when_the_lineage_is_absent(tmp_path):
+    """Older run directories predate the field. Omitting the claim is right;
+    crashing after a 90-minute sweep is not."""
+    gx = _genomex_json(tmp_path, [_gx_entry("g1")])
+    cm = _report(tmp_path, ["g1\t100.0\t0.5\t0.88\t4152217\t7650000\t63.5\t6771\t3"])
+    out = tmp_path / "page.md"
+
+    assert bench.main(["--genomex", str(gx), "--checkm2", str(cm), "--out", str(out)]) == 0
+    assert "1 genomes compared." in out.read_text(encoding="utf-8")
