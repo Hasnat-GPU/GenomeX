@@ -131,3 +131,46 @@ and the resulting number would mean nothing on any other collection.
 When a benchmark fails, the method gets fixed and re-measured. If it still
 fails, that is the finding, and it gets published — which is why the README
 currently tells users not to rely on the contamination verdict.
+
+## 12. Thresholds on a marker set are rates, not counts
+
+The contamination verdict tests `cross_contig_dups / n_markers` against 4.03%
+and 1.61%, not the raw count against 5 and 2.
+
+**Why:** those cutoffs were written against `bacteria_odb10` and its 124
+markers, and nothing recorded that dependency. Scanning the same finished genome
+against `burkholderiales_odb10` — 688 markers, more appropriate for this
+collection, not one base of extra contamination — multiplies every count by 5.5,
+and four reference genomes carrying an ordinary ~1% of cross-replicon paralogy
+were reported as `likely` contaminated.
+
+A count is not a property of the genome; it is a property of the genome and the
+marker set together. The rate is the invariant: a mixture holding a foreign
+genome at mass fraction *f* displaces roughly *f × N* of *N* single-copy
+markers, so the rate estimates *f* whatever *N* is.
+
+The new thresholds are the old ones divided by 124, `>=` preserved, so on
+`bacteria_odb10` the rule is unchanged bit for bit. **Rejected:** recalibrating
+the thresholds against the collection. That would have been fitting to the test
+set, and there was no need — the defect was units, not calibration.
+
+## 13. Recall needs constructed truth, not a borrowed number
+
+`bench/mixture_ladder.py` splices fragments of one genome into another at a
+known share of the total and asks the detector to name them.
+
+**Why:** the only recall figure available before came from CheckM2, and just
+four of those 72 genomes exceed 5% contamination — an average of four coin
+flips, on a test set that should be spent once rather than developed against.
+The fragmentation ladder is constructed truth but adds nothing foreign, so it
+measures specificity and is silent on recall.
+
+Two construction choices carry the result. Donor fragments match host fragments
+in length, because real contaminants assemble shorter and length would otherwise
+be a shortcut the length-conditioned null could exploit. Donor fragments carry
+their share of the single-copy core, because they are cut from a real genome and
+withholding that would test a detector nobody runs.
+
+**Rejected:** simulating a contaminant from a composition model. The whole
+question is whether real between-genome composition differences are separable,
+and a simulated donor would answer a question about the simulator instead.
