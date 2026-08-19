@@ -29,7 +29,10 @@ genomex/
   compare.py        ANI, orthogroups, strain-unique genes with causes  ← hero module 2
   pipeline.py       orchestration; contamination feeds the comparison
   report.py         standalone HTML + JSON
-tests/              40 tests: unit, ground-truth contamination, and end-to-end with real tools
+bench/              reproducible comparisons against BUSCO and CheckM2
+tests/              unit, ground-truth contamination, and end-to-end with real tools
+docs/decisions.md   why the design is what it is, and what was rejected
+CLAUDE.md           orientation for agents working in the repo
 .claude/skills/genomex/SKILL.md   the unified skill: how to run it and how to read it
 ```
 

@@ -52,3 +52,9 @@ bench/busco_out/
 bench/*.log
 busco_downloads/
 busco_*.log
+
+# --- machine-local working state -------------------------------------------
+# CLAUDE.md and .claude/skills/ are tracked deliberately: they are project
+# artefacts. .claude/state/ is not -- it holds live progress notes and paths
+# specific to one machine.
+.claude/state/
