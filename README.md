@@ -180,12 +180,20 @@ Alpha, but no longer uncalibrated. Completeness and duplication now match BUSCO
 exactly on every marker of the demo set, and that comparison is reproducible
 from `bench/`.
 
-What remains unvalidated is the part with no reference implementation to check
-against: the contamination thresholds, the replicon/contaminant split, and the
-island null model were all set against four genomes and a synthetic fixture. The
-algorithms are tested against planted ground truth and the plumbing runs
-end-to-end in CI, but four genomes is not a validation set. Contamination has not
-been compared against CheckM2.
+**The contamination verdict does not currently work on real drafts**, and that is
+measured, not suspected. Against CheckM2 over 72 published assemblies it flags 62
+while CheckM2 puts 4 above 5% contamination, and its median CheckM2 contamination
+is flat across all three verdict levels — see
+[`docs/benchmark-contamination.md`](docs/benchmark-contamination.md). Use the
+per-contig evidence in `contigs.tsv`; do not rely on the headline verdict until
+this is fixed.
+
+The same comparison verified what does work: genome size, contig count, GC, N50,
+CDS count and coding density agree with CheckM2 exactly across all 72 genomes,
+and completeness agrees to 0.55 points mean absolute difference.
+
+The replicon/contaminant split has no reference implementation to check against
+and remains unvalidated.
 
 If you have a genome where a call is wrong, that is the
 [most useful contribution](CONTRIBUTING.md) you can make.
