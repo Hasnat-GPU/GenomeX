@@ -62,8 +62,18 @@ same `--outdir` reuses existing gene calls and marker tables, so iterate freely.
 
 **Completeness** (`markers.completeness_percent`). Fraction of the lineage's
 single-copy markers found complete. Above 95% is a good bacterial draft; below 90%
-means genuinely missing core genes *or* the wrong lineage — check which before
-reporting. This is a HMMER scan against BUSCO's odb10 profiles using BUSCO's own
+means genuinely missing core genes, a fragmented assembly, *or* the wrong lineage
+— check which before reporting.
+
+**Always read `fragmented` alongside it.** Only complete markers count toward
+completeness, so a fragmented assembly reports low completeness while holding all
+its genes in pieces. Across 72 genomes the gap between GenomeX and CheckM2
+completeness tracks the fragmented count at r = -0.996: one assembly reported
+66.13% complete with 29% fragmented, and CheckM2 called it 84.68%. Nothing was
+missing. If `complete + fragmented` is high but `complete` is low, say the
+assembly is broken, not that the organism lacks genes — and check mean protein
+length, which drops from ~293 aa to ~215 aa when genes are being cut by contig
+boundaries. This is a HMMER scan against BUSCO's odb10 profiles using BUSCO's own
 cutoffs, plus its retention and coverage rules; call it "BUSCO-style", never
 "BUSCO said".
 

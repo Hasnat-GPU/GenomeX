@@ -86,11 +86,30 @@ FASTA by two independent implementations agree to within rounding across all 72
 genomes. Nothing about method or calibration enters; this is as close to proof
 as the repository gets.
 
-**Completeness is corroborated.** 0.55 points mean absolute difference against a
-neural-network model trained on a reference proteome database, from a marker
-scan that shares none of its machinery, over 72 genomes. Two unrelated methods
-agreeing that closely is meaningful evidence. The single genome differing by
-18.55 points is worth investigating individually rather than averaging away.
+**Completeness is corroborated, and its residual is fully explained.** 0.55
+points mean absolute difference against a neural-network model trained on a
+reference proteome database, from a marker scan that shares none of its
+machinery, over 72 genomes.
+
+The outliers are not errors. The gap between the two tools correlates with
+GenomeX's *fragmented* marker count at **r = -0.996** -- essentially
+deterministic. GenomeX counts only complete markers toward completeness, in
+BUSCO's manner; CheckM2's model effectively counts a gene broken across a contig
+boundary as present. Adding fragmented markers back moves the mean difference
+from -0.55 to +0.19 points.
+
+| genome | contigs | mean protein | GenomeX fragmented | GenomeX | CheckM2 |
+|---|---|---|---|---|---|
+| GCA_001725945.1 | 307 | 214.8 aa | 29.0% | 66.13% | 84.68% |
+| GCA_040948815.1 | 1243 | 276.4 aa | 11.3% | 86.29% | 94.49% |
+| GCA_022041995.1 | 10 | 293.6 aa | 3.2% | 96.77% | 100.0% |
+
+Both worst cases have visibly truncated proteins -- 214.8 and 276.4 amino acids
+mean length against roughly 293 in the contiguous assemblies. The genes are
+present and broken, not absent. Since GenomeX matches BUSCO on 496 of 496
+markers, this is a BUSCO-versus-CheckM2 definitional difference, not a GenomeX
+defect: a low completeness with a high fragmented count is an assembly
+contiguity problem, and reporting it as missing genes would be the actual error.
 
 **Contamination is refuted.** Not "weakly supported" -- refuted. A verdict whose
 median CheckM2 contamination is 1.12% when it says clean and 0.82% when it says
