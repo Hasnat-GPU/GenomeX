@@ -40,8 +40,9 @@ ul.reasons{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
 </style>
 <div class="wrap">
 <h1>GenomeX report</h1>
-<div class="sub">4 genome(s) &middot; 6 pairwise comparison(s) &middot; 26.1 s &middot; genomex 0.2.0</div>
+<div class="sub">4 genome(s) &middot; 6 pairwise comparison(s) &middot; 25.6 s &middot; genomex 0.3.0</div>
 <h2>Genome quality</h2>
+<div class="note">Scored against <b>bacteria_odb10</b> (124 markers). Completeness, duplication and the contamination verdict are all relative to this set &mdash; the same genome against a different one is a different measurement. This is the universal bacterial set, so it is also the least sensitive: on constructed 2% mixtures a lineage-specific set locates 4 of 4 donor pairs and this one 0 of 4. A <b>single organism</b> verdict here is a weaker statement than the same verdict at 688 markers. <code>genomex lineages</code> lists what else is installed.</div>
 <div class="card">
 <h3>GCA_000300095.1 &nbsp; <span class="pill ok">single organism</span> <span class="pill ok">usable</span></h3>
 <div class="grid">
@@ -54,7 +55,7 @@ ul.reasons{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
 <div class="stat"><div class="k">completeness</div><div class="v">100.0%</div></div>
 <div class="stat"><div class="k">duplicated</div><div class="v">1.61%</div></div>
 </div>
-<div class="note"><code>C:100.0%[S:98.39%,D:1.61%],F:0.0%,M:0.0%,n:124</code></div>
+<div class="note"><code>C:100.0%[S:98.39%,D:1.61%],F:0.0%,M:0.0%,n:124</code> &middot; scored against <b>bacteria_odb10</b></div>
 <div class="bar"><span style="width:98.39%;background:var(--ok)"></span><span style="width:1.61%;background:var(--warn)"></span></div><div class="legend"><span><i style="background:var(--ok)"></i>single copy 122</span><span><i style="background:var(--warn)"></i>duplicated 2</span><span><i style="background:var(--accent)"></i>fragmented 0</span><span><i style="background:var(--bad)"></i>missing 0</span></div>
 <h3>Contamination evidence</h3><ul class="reasons"><li>1 large contig(s) (10.27% of assembly) have distinct composition but carry no displaced core markers -- consistent with a plasmid or a second chromosome, not resolvable by composition alone</li></ul>
 <div class="scroll"><table><thead><tr><th>composition bin</th><th>contigs</th><th>bases</th><th>% of assembly</th><th>mean GC%</th></tr></thead><tbody><tr><td>bin0</td><td class="num">2</td><td class="num">6,865,712</td><td class="num">89.73</td><td class="num">63.61</td></tr><tr><td>bin1</td><td class="num">1</td><td class="num">785,419</td><td class="num">10.27</td><td class="num">59.11</td></tr></tbody></table></div>
@@ -74,7 +75,7 @@ ul.reasons{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
 <div class="stat"><div class="k">completeness</div><div class="v">100.0%</div></div>
 <div class="stat"><div class="k">duplicated</div><div class="v">0.81%</div></div>
 </div>
-<div class="note"><code>C:100.0%[S:99.19%,D:0.81%],F:0.0%,M:0.0%,n:124</code></div>
+<div class="note"><code>C:100.0%[S:99.19%,D:0.81%],F:0.0%,M:0.0%,n:124</code> &middot; scored against <b>bacteria_odb10</b></div>
 <div class="bar"><span style="width:99.19%;background:var(--ok)"></span><span style="width:0.81%;background:var(--warn)"></span></div><div class="legend"><span><i style="background:var(--ok)"></i>single copy 123</span><span><i style="background:var(--warn)"></i>duplicated 1</span><span><i style="background:var(--accent)"></i>fragmented 0</span><span><i style="background:var(--bad)"></i>missing 0</span></div>
 <h3>Contamination evidence</h3><ul class="reasons"><li>7 large contig(s) (3.84% of assembly) have distinct composition but carry no displaced core markers -- consistent with a plasmid or a second chromosome, not resolvable by composition alone</li><li>1 single-copy markers duplicated across different contigs (0.81% of the 124-marker set)</li><li>composition is bimodal: minor bin holds 5.19% of bases at a 4.16 point GC offset</li></ul>
 <div class="scroll"><table><thead><tr><th>composition bin</th><th>contigs</th><th>bases</th><th>% of assembly</th><th>mean GC%</th></tr></thead><tbody><tr><td>bin0</td><td class="num">25</td><td class="num">6,365,364</td><td class="num">94.23</td><td class="num">63.86</td></tr><tr><td>bin1</td><td class="num">10</td><td class="num">350,796</td><td class="num">5.19</td><td class="num">59.7</td></tr></tbody></table></div>
@@ -94,7 +95,7 @@ ul.reasons{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
 <div class="stat"><div class="k">completeness</div><div class="v">100.0%</div></div>
 <div class="stat"><div class="k">duplicated</div><div class="v">0.0%</div></div>
 </div>
-<div class="note"><code>C:100.0%[S:100.0%,D:0.0%],F:0.0%,M:0.0%,n:124</code></div>
+<div class="note"><code>C:100.0%[S:100.0%,D:0.0%],F:0.0%,M:0.0%,n:124</code> &middot; scored against <b>bacteria_odb10</b></div>
 <div class="bar"><span style="width:100.00%;background:var(--ok)"></span></div><div class="legend"><span><i style="background:var(--ok)"></i>single copy 124</span><span><i style="background:var(--warn)"></i>duplicated 0</span><span><i style="background:var(--accent)"></i>fragmented 0</span><span><i style="background:var(--bad)"></i>missing 0</span></div>
 <h3>Contamination evidence</h3><ul class="reasons"><li>1 large contig(s) (6.86% of assembly) have distinct composition but carry no displaced core markers -- consistent with a plasmid or a second chromosome, not resolvable by composition alone</li></ul>
 <div class="scroll"><table><thead><tr><th>composition bin</th><th>contigs</th><th>bases</th><th>% of assembly</th><th>mean GC%</th></tr></thead><tbody><tr><td>bin0</td><td class="num">3</td><td class="num">8,081,454</td><td class="num">93.14</td><td class="num">62.52</td></tr><tr><td>bin1</td><td class="num">1</td><td class="num">595,108</td><td class="num">6.86</td><td class="num">59.18</td></tr></tbody></table></div>
@@ -114,7 +115,7 @@ ul.reasons{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
 <div class="stat"><div class="k">completeness</div><div class="v">99.19%</div></div>
 <div class="stat"><div class="k">duplicated</div><div class="v">1.61%</div></div>
 </div>
-<div class="note"><code>C:99.19%[S:97.58%,D:1.61%],F:0.81%,M:0.0%,n:124</code></div>
+<div class="note"><code>C:99.19%[S:97.58%,D:1.61%],F:0.81%,M:0.0%,n:124</code> &middot; scored against <b>bacteria_odb10</b></div>
 <div class="bar"><span style="width:97.58%;background:var(--ok)"></span><span style="width:1.61%;background:var(--warn)"></span><span style="width:0.81%;background:var(--accent)"></span></div><div class="legend"><span><i style="background:var(--ok)"></i>single copy 121</span><span><i style="background:var(--warn)"></i>duplicated 2</span><span><i style="background:var(--accent)"></i>fragmented 1</span><span><i style="background:var(--bad)"></i>missing 0</span></div>
 <h3>Contamination evidence</h3><ul class="reasons"><li>1 large contig(s) (8.6% of assembly) have distinct composition but carry no displaced core markers -- consistent with a plasmid or a second chromosome, not resolvable by composition alone</li><li>1 single-copy markers duplicated across different contigs (0.81% of the 124-marker set)</li></ul>
 <div class="scroll"><table><thead><tr><th>composition bin</th><th>contigs</th><th>bases</th><th>% of assembly</th><th>mean GC%</th></tr></thead><tbody><tr><td>bin0</td><td class="num">2</td><td class="num">5,919,322</td><td class="num">91.4</td><td class="num">67.68</td></tr><tr><td>bin1</td><td class="num">1</td><td class="num">557,200</td><td class="num">8.6</td><td class="num">59.66</td></tr></tbody></table></div>

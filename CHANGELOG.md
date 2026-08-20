@@ -6,6 +6,18 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-20
+
+Two input paths that were not reachable before -- a proteome, and any marker set
+other than the default -- plus three refusals that were reporting as results.
+
+The recall position is stated once here rather than twice: **contamination
+detection depends on the marker set, and against CheckM2 at >=5% the default
+124-marker set now catches 0 of 4.** That fell from 0.25 in this release, as the
+cost of the fragmentation fix below, and the release notes say so in one place
+instead of splitting it across two versions. `genomex lineages` exists so the
+choice is visible at the point it is made.
+
 ### Added
 
 - **`genomex lineages`, and `--lineage` by name.** The marker set is the flag
@@ -322,7 +334,8 @@ First working version: assemblies in, an evidence-linked report out.
   the symbiosis megaplasmids of *P. phenoliruptrix*, *P. phymatum* and
   *C. taiwanensis*.
 
-[Unreleased]: https://github.com/Hasnat-GPU/GenomeX/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Hasnat-GPU/GenomeX/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Hasnat-GPU/GenomeX/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Hasnat-GPU/GenomeX/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Hasnat-GPU/GenomeX/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Hasnat-GPU/GenomeX/releases/tag/v0.1.0
