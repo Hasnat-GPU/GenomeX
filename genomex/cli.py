@@ -3,6 +3,7 @@
     python -m genomex run A.fna B.fna --outdir runs/demo
     python -m genomex run *.fna --outdir runs/all --all-pairs
     python -m genomex qc A.fna --outdir runs/qc
+    python -m genomex proteins P.faa --lineage ~/db/fungi_odb10 --outdir runs/prot
 """
 
 from __future__ import annotations
@@ -11,24 +12,31 @@ import argparse
 import sys
 from pathlib import Path
 
-from .pipeline import DEFAULT_LINEAGE, run_pipeline
+from .pipeline import DEFAULT_LINEAGE, run_pipeline, run_proteome_pipeline
+from .proteome import NotAnAssembly, NotAProteome
 from .report import write_html_report
 from .runtime import ToolMissing
 
 
-def _add_common(p: argparse.ArgumentParser) -> None:
-    p.add_argument("inputs", nargs="+", help="assembly FASTA files (.fna/.fa/.fasta, optionally .gz)")
+def _add_base(p: argparse.ArgumentParser, inputs_help: str) -> None:
+    p.add_argument("inputs", nargs="+", help=inputs_help)
     p.add_argument("--outdir", "-o", default="runs/latest", help="output directory")
     p.add_argument(
         "--lineage",
         default=str(DEFAULT_LINEAGE),
         help="BUSCO odb10 lineage directory (default: %(default)s)",
     )
+    p.add_argument("--threads", type=int, default=None)
+    p.add_argument("--quiet", action="store_true")
+
+
+def _add_common(p: argparse.ArgumentParser) -> None:
+    """Flags for the assembly path. Kept off `proteins`, where a translation
+    table and a contig-length floor would both be accepted and ignored."""
+    _add_base(p, "assembly FASTA files (.fna/.fa/.fasta, optionally .gz)")
     p.add_argument("--genetic-code", type=int, default=11, help="Prodigal translation table (11 bacteria)")
     p.add_argument("--min-contig-length", type=int, default=3000,
                    help="shortest contig entering composition analysis")
-    p.add_argument("--threads", type=int, default=None)
-    p.add_argument("--quiet", action="store_true")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -51,6 +59,20 @@ def build_parser() -> argparse.ArgumentParser:
     qc = sub.add_parser("qc", help="per-genome QC only: no clustering, no ANI")
     _add_common(qc)
 
+    prot = sub.add_parser(
+        "proteins",
+        help="completeness and duplication from a protein FASTA (no contamination, no comparison)",
+        description=(
+            "Score a supplied proteome against a BUSCO odb10 lineage. This is the "
+            "whole of what a proteome supports: with no contigs there is no "
+            "contamination analysis, no ANI and no gene order, and the report says "
+            "so rather than showing them empty. Use it for lineages GenomeX cannot "
+            "call genes for -- eukaryotes -- or when you already have a proteome you "
+            "trust."
+        ),
+    )
+    _add_base(prot, "protein FASTA files (.faa/.fa/.fasta, optionally .gz)")
+
     return p
 
 
@@ -65,6 +87,20 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     outdir = Path(args.outdir)
+    if args.command == "proteins":
+        try:
+            result = run_proteome_pipeline(
+                inputs, outdir, lineage_path=args.lineage,
+                threads=args.threads, log=log,
+            )
+        except NotAProteome as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 4
+        except ToolMissing as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 3
+        return _emit(result, outdir, log)
+
     try:
         result = run_pipeline(
             inputs,
@@ -80,10 +116,17 @@ def main(argv: list[str] | None = None) -> int:
             threads=args.threads,
             log=log,
         )
+    except NotAnAssembly as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 4
     except ToolMissing as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 3
 
+    return _emit(result, outdir, log)
+
+
+def _emit(result, outdir: Path, log) -> int:
     json_path = result.write_json(outdir / "genomex.json")
     html_path = write_html_report(result, outdir / "report.html")
     if result.runtime:

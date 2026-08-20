@@ -59,6 +59,21 @@ def _pill(verdict: str) -> str:
     return f'<span class="pill {cls}">{_esc(label)}</span>'
 
 
+def _usability_pill(usable) -> str:
+    """Three states, because `usable` has three.
+
+    `None` means the contamination check did not run, and rendering it as "hold"
+    would claim a check found a problem. A boolean-shaped ternary here is how the
+    unassessed case used to come out green.
+    """
+    if usable is None:
+        return '<span class="pill warn">usability undetermined</span>'
+    return (
+        '<span class="pill ok">usable</span>' if usable
+        else '<span class="pill bad">hold</span>'
+    )
+
+
 def _stat(k, v) -> str:
     return f'<div class="stat"><div class="k">{_esc(k)}</div><div class="v">{_esc(v)}</div></div>'
 
@@ -93,8 +108,23 @@ def _table(headers: list[str], rows: list[list[str]], numeric: set[int] | None =
     return f'<div class="scroll"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
 
 
+def _not_measured_table(nm: dict) -> str:
+    """Render the explicit refusals.
+
+    A reader who sees no contamination section assumes the run was clean. This
+    is the difference between "we looked and found nothing" and "we could not
+    look", and it is the whole reason proteome results are rendered separately.
+    """
+    rows = [
+        [key.replace("_", " "), v.get("status", ""), v.get("reason", "")]
+        for key, v in sorted(nm.items())
+    ]
+    return _table(["not reported", "status", "why"], rows)
+
+
 def render_html(data: dict) -> str:
     genomes = data.get("genomes", [])
+    proteomes = data.get("proteomes", [])
     pairs = data.get("pairs", [])
     pg = data.get("pangenome")
     prov = data.get("provenance", {})
@@ -103,20 +133,27 @@ def render_html(data: dict) -> str:
     parts.append(f"<title>GenomeX Report</title><style>{CSS}</style>")
     parts.append('<div class="wrap">')
     parts.append("<h1>GenomeX report</h1>")
+    counted = []
+    if genomes:
+        counted.append(f"{len(genomes)} genome(s)")
+    if proteomes:
+        counted.append(f"{len(proteomes)} proteome(s)")
+    if pairs or not counted:
+        counted.append(f"{len(pairs)} pairwise comparison(s)")
     parts.append(
-        f'<div class="sub">{len(genomes)} genome(s) &middot; {len(pairs)} pairwise comparison(s) '
+        f'<div class="sub">{" &middot; ".join(counted)} '
         f'&middot; {data.get("seconds", 0)} s &middot; genomex {_esc(data.get("genomex_version", ""))}</div>'
     )
 
     # ---- per genome -------------------------------------------------------
-    parts.append("<h2>Genome quality</h2>")
+    if genomes:
+        parts.append("<h2>Genome quality</h2>")
     for g in genomes:
         a, m, c, q = g["assembly"], g["markers"], g["contamination"], g["quality_call"]
         parts.append('<div class="card">')
         parts.append(
             f'<h3>{_esc(g["genome"])} &nbsp; {_pill(c["verdict"])} '
-            f'<span class="pill {"ok" if q["usable_for_comparative_analysis"] else "bad"}">'
-            f'{"usable" if q["usable_for_comparative_analysis"] else "hold"}</span></h3>'
+            f'{_usability_pill(q["usable_for_comparative_analysis"])}</h3>'
         )
         parts.append('<div class="grid">')
         parts.append(_stat("size", f'{a["total_bp"] / 1e6:.2f} Mb'))
@@ -164,6 +201,45 @@ def render_html(data: dict) -> str:
                 '<b>marker_conflict</b> shares duplicated core markers while '
                 'composition looks native.</div>'
             )
+        parts.append("</div>")
+
+    # ---- per proteome -----------------------------------------------------
+    # Its own section, not a genome card with holes in it. Every stat here is a
+    # property of the protein file itself; nothing is inferred about a genome.
+    if proteomes:
+        parts.append("<h2>Proteome completeness</h2>")
+        parts.append(
+            '<div class="note">Scored from a supplied protein FASTA. GenomeX did not '
+            'call these genes, and there is no assembly behind them &mdash; so this '
+            'section reports completeness and duplication, and nothing else.</div>'
+        )
+    for p in proteomes:
+        m, s, q = p["markers"], p["proteins"], p["quality_call"]
+        parts.append('<div class="card">')
+        parts.append(
+            f'<h3>{_esc(p["name"])} &nbsp; '
+            f'<span class="pill {"ok" if q["completeness_grade"] == "high" else "warn"}">'
+            f'{_esc(q["completeness_grade"])} completeness</span> '
+            f'<span class="pill warn">contamination not measured</span></h3>'
+        )
+        parts.append('<div class="grid">')
+        parts.append(_stat("proteins", f'{s["n_proteins"]:,}'))
+        parts.append(_stat("mean length", f'{s["mean_protein_aa"]} aa'))
+        parts.append(_stat("median length", f'{s["median_protein_aa"]} aa'))
+        parts.append(_stat("completeness", f'{m["completeness_percent"]}%'))
+        parts.append(_stat("duplicated", f'{m["duplication_percent"]}%'))
+        parts.append("</div>")
+        parts.append(f'<div class="note"><code>{_esc(m["busco_style_string"])}</code></div>')
+        parts.append(_marker_bar(m))
+        reasons = "".join(f"<li>{_esc(r)}</li>" for r in q["reasons"])
+        parts.append(f'<h3>Assessment</h3><ul class="reasons">{reasons}</ul>')
+        parts.append("<h3>Not measured, and why</h3>")
+        parts.append(_not_measured_table(p.get("not_measured", {})))
+        parts.append(
+            '<div class="note"><b>impossible</b> the input does not carry the '
+            'information &middot; <b>unimplemented</b> the information is derivable '
+            'from a proteome, but this path does not derive it.</div>'
+        )
         parts.append("</div>")
 
     # ---- pangenome --------------------------------------------------------
@@ -239,10 +315,14 @@ def render_html(data: dict) -> str:
     )
 
     parts.append("<h2>What this report does not tell you</h2><div class='card'><ul class='limits'>")
-    for lim in [
-        "Completeness is a HMMER scan against BUSCO's odb10 profiles with BUSCO's own score and "
-        "length cutoffs -- close to BUSCO, but not BUSCO. It does not re-predict genes per marker "
-        "region, so counts can differ by a marker or two.",
+    proteome_limits = [
+        "For a supplied proteome, completeness measures the proteome, not the genome. A marker "
+        "missing here may be absent from the assembly or missed by whatever called the genes -- "
+        "GenomeX did not call them and cannot separate the two.",
+        "Marker duplication on a proteome is not a contamination signal. Without contigs there is "
+        "no way to tell a second organism's copy from a redundant gene model.",
+    ] if proteomes else []
+    genome_limits = [
         "Contamination detection is composition-based. It sees organisms whose k-mer signature "
         "differs from the host; it is blind to a close relative of the host, and it cannot name "
         "the contaminant without a reference database.",
@@ -254,6 +334,13 @@ def render_html(data: dict) -> str:
         "detection, tRNA boundaries, or codon-usage models. Treat them as candidates.",
         "fastANI reports nothing below roughly 80% identity; an unresolved ANI means distant, "
         "not identical.",
+    ] if genomes else []
+    for lim in [
+        "Completeness is a HMMER scan against BUSCO's odb10 profiles with BUSCO's own score and "
+        "length cutoffs -- close to BUSCO, but not BUSCO. It does not re-predict genes per marker "
+        "region, so counts can differ by a marker or two.",
+        *proteome_limits,
+        *genome_limits,
     ]:
         parts.append(f"<li>{_esc(lim)}</li>")
     parts.append("</ul></div>")

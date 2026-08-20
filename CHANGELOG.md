@@ -6,6 +6,66 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`proteins` subcommand: completeness from a protein FASTA.** `scan_markers`
+  always accepted a proteome — the assembly path just hands it Prodigal's output
+  — but there was no route to it from the CLI. This adds one, which is what makes
+  eukaryotic lineages reachable at all: on the *S. cerevisiae* S288C proteome
+  against `fungi_odb10` it agrees with BUSCO 5.8.3 on **758/758 markers**, every
+  one naming the same protein.
+
+  It reports completeness and duplication and refuses everything else **by name**.
+  A proteome has no contigs, so contamination, ANI and genomic islands are not
+  absent from the report — they are listed with the reason each cannot be
+  computed, separated into `impossible` (the input does not carry the
+  information) and `unimplemented` (it does, but this path does not derive it —
+  orthogroups). An empty contamination section reads as "we looked and found
+  nothing"; that is the failure this design exists to avoid.
+
+  Proteome results are emitted under their own `proteomes` key rather than mixed
+  into `genomes`, so no existing consumer can read an assembly-shaped object out
+  of a proteome run.
+
+- **Both input paths now refuse the other's file type.** Handed a proteome, the
+  assembly path did not fail — it *measured*. `Assembly.load` makes one contig
+  per protein and `assembly_stats` computes GC from the glycine and cysteine
+  counts, because A/C/G/T are also alanine, cysteine, glycine and threonine. On
+  the S288C proteome that yields **GC 35.36% against the genome's real 38.15%**:
+  in range, and not catchable by eye.
+
+  The discriminator is the share of residues with no nucleotide meaning under any
+  IUPAC reading (E, F, I, L, P, Q, X, Z, J, O) — deliberately not "how much of
+  this is ACGTU", which a 20%-N scaffold fails at 0.80. Measured: proteome
+  0.3535, genome 0.0000, bacterial assembly 0.0000, N-gapped scaffold 0.0000.
+  Below 200 residues the test abstains: sixteen letters are legal nucleotide
+  ambiguity codes, so a short peptide can be entirely nucleotide-legal by chance.
+
+### Fixed
+
+- **A marker hit with no known contig is now recorded as unknown, not guessed.**
+  `parse_domtbl` fell back to `protein_id.rsplit("_", 1)[0]`, which is Prodigal's
+  `<contig>_<n>` convention. On NCBI identifiers it invented contigs — 754 of 777
+  marker hits on the S288C proteome landed on one fictitious contig called `NP`.
+  `MarkerResult` now carries `contigs_known`, and `contig_marker_counts()` and
+  `duplicated_marker_contigs()` return `None` rather than aggregating on the
+  sentinel; the latter matters because `detect_contamination` reads two copies on
+  one contig as affirmative evidence of paralogy. The fallback never fired on the
+  assembly path, which passes a complete map: re-deriving all 72 genomes changes
+  **0 of 9,002** marker rows under `bacteria_odb10` and **0 of 49,963** under
+  `burkholderiales_odb10`.
+
+- **`usable_for_comparative_analysis` no longer reports `true` when
+  contamination was never assessed.** The old expression was
+  `completeness_grade != "low" and c.verdict != "likely"`, and `undetermined` is
+  not `likely` — so a genome whose composition could not be scored came out
+  green, with the reason "complete single-copy core, single-organism
+  composition": a positive claim about a measurement that did not run. It is now
+  `null` with the abstention's own reason attached, and the report renders a
+  third pill state rather than a boolean. This fires on finished single-replicon
+  genomes, which have too few scorable contigs; none of the 72 benchmark genomes
+  reach that path, which is why it survived this long.
+
 ### Changed
 
 - **A compositional outlier that carries core markers is no longer contamination

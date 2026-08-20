@@ -98,6 +98,9 @@ class MarkerResult:
     fragmented: list[str] = field(default_factory=list)
     missing: list[str] = field(default_factory=list)
     hits: list[MarkerHit] = field(default_factory=list)
+    #: False when the scan had no protein->contig map, i.e. a supplied
+    #: proteome. Everything contig-shaped downstream must refuse, not guess.
+    contigs_known: bool = True
 
     @property
     def complete(self) -> int:
@@ -111,15 +114,30 @@ class MarkerResult:
     def duplication_percent(self) -> float:
         return round(100.0 * len(self.duplicated) / self.n_markers, 2) if self.n_markers else 0.0
 
-    def contig_marker_counts(self) -> dict[str, int]:
+    def contig_marker_counts(self) -> dict[str, int] | None:
+        """Complete markers per contig, or None when contigs are unknown.
+
+        None rather than a dict keyed on the sentinel. Aggregating on "-" would
+        report that one contig carries every marker in the genome.
+        """
+        if not self.contigs_known:
+            return None
         counts: dict[str, int] = defaultdict(int)
         for h in self.hits:
             if h.status == "complete":
                 counts[h.contig] += 1
         return dict(counts)
 
-    def duplicated_marker_contigs(self) -> dict[str, list[str]]:
-        """busco_id -> contigs carrying each complete copy, for duplicated markers."""
+    def duplicated_marker_contigs(self) -> dict[str, list[str]] | None:
+        """busco_id -> contigs carrying each complete copy, for duplicated markers.
+
+        None when contigs are unknown, and the distinction matters more here than
+        anywhere else: `detect_contamination` reads two copies on *one* contig as
+        affirmative evidence of paralogy and discards the marker. Returning
+        `{"B1": ["-", "-"]}` would launder missing information into that finding.
+        """
+        if not self.contigs_known:
+            return None
         dup = set(self.duplicated)
         per: dict[str, list[str]] = defaultdict(list)
         for h in self.hits:
@@ -152,6 +170,17 @@ class MarkerResult:
             "method": "HMMER hmmsearch vs BUSCO odb10 profiles (BUSCO-compatible, not BUSCO)",
         }
 
+
+#: Written in the contig column when a hit cannot be attributed to a contig.
+#:
+#: This replaced `protein_id.rsplit("_", 1)[0]`, which existed because Prodigal
+#: names proteins `<contig>_<n>`. On any other naming it invented contigs: every
+#: NCBI protein `NP_009332.1` became contig `NP`, so 754 of 777 marker hits on
+#: the S. cerevisiae proteome landed on one fictitious contig. The guess never
+#: fired on the assembly path -- `analyze_genome` passes a complete map -- so
+#: removing it changes no validated result, and stops the next caller inheriting
+#: a wrong answer instead of a blank.
+UNKNOWN_CONTIG = "-"
 
 #: BUSCO keeps only matches scoring within this fraction of a marker's best hit.
 #: Without it, every weak hit above a permissive score cutoff counts as another
@@ -285,7 +314,7 @@ def parse_domtbl(
             MarkerHit(
                 busco_id=busco_id,
                 protein_id=protein_id,
-                contig=gene_contig.get(protein_id, protein_id.rsplit("_", 1)[0]),
+                contig=gene_contig.get(protein_id, UNKNOWN_CONTIG),
                 score=full_score,
                 matched_aa=matched,
                 status=status,
@@ -306,7 +335,12 @@ def parse_domtbl(
     for h in hits:
         by_marker[h.busco_id].append(h)
 
-    res = MarkerResult(lineage=lineage.name, n_markers=lineage.n_markers, hits=hits)
+    res = MarkerResult(
+        lineage=lineage.name,
+        n_markers=lineage.n_markers,
+        hits=hits,
+        contigs_known=bool(gene_contig),
+    )
     for busco_id in lineage.scores:
         marker_hits = by_marker.get(busco_id, [])
         n_complete = sum(1 for h in marker_hits if h.status == "complete")

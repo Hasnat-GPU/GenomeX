@@ -91,6 +91,23 @@ lineage full of paralogous families. See `docs/decisions.md` #15.
 Exits non-zero on any disagreement, so it can be used as a check rather than
 read by eye.
 
+The `proteins` subcommand now reaches the same scan from the CLI, and reproduces
+this result exactly — same statuses, same named proteins, 758/758 against BUSCO
+5.8.3:
+
+```bash
+python -m genomex proteins ~/genomex-work/data/Fungi/GCF_000146045.2.faa \
+    --lineage ~/genomex-work/db/fungi_odb10 \
+    --outdir  ~/genomex-work/runs/scer_prot
+```
+
+The two differ in one column. This script let `parse_domtbl` fall back to
+`protein_id.rsplit("_", 1)[0]` for the contig, which on NCBI identifiers put 754
+of 777 hits on a fictitious contig named `NP`; the CLI path records `-` and sets
+`contigs_known=False`. Keep both: the script isolates the scan for a lineage the
+pipeline has no gene caller for, and it is the only place a new lineage can be
+validated before anything else consumes it.
+
 ## Fragmentation ladder — constructed specificity
 
 ```bash

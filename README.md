@@ -56,7 +56,15 @@ No sudo, no Docker, no conda base install required.
 ```bash
 python -m genomex run A.fna B.fna --outdir runs/demo --all-pairs
 python -m genomex qc  A.fna       --outdir runs/qc          # per-genome only
+python -m genomex proteins P.faa  --outdir runs/prot --lineage ~/db/fungi_odb10
 ```
+
+`proteins` takes a protein FASTA instead of an assembly. It is the only path
+that reaches lineages GenomeX cannot call genes for -- validated at 758/758
+markers against BUSCO 5.8.3 on `fungi_odb10`. It yields completeness and
+duplication and nothing else: with no contigs there is no contamination
+analysis, no ANI and no gene order, and the report lists each of those as an
+explicit refusal rather than an empty section.
 
 From Windows PowerShell, `.\gx.ps1 run A.fna B.fna --outdir runs/demo` forwards
 into WSL with the environment already set.

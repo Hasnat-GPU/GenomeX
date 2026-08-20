@@ -62,6 +62,8 @@ Read this before repeating any number to a user.
 | Contamination localisation | **fails for close relatives** — donor a genus away at 4-pt GC offset: recall 0.91–1.00. Same-genus donor at 0.3 pt: never localised, even at 20%. Empty suspect list ≠ nothing foreign |
 | Fragmentation invariance | **0/320 shreddings of finished genomes produce a false verdict** (v0.2.0: 40/320, 12.5%, rising to 26.6% at 1000 pieces — the old "13/15 rungs" was one draw); corr(score, log length) −0.09 |
 | replicon vs contaminant split | rests on core-marker rate; genuinely ambiguous without coverage depth |
+| Proteome input (`proteins`) | **verified** — 758/758 markers identical to BUSCO 5.8.3 on the *S. cerevisiae* proteome vs `fungi_odb10`. Completeness and duplication only; contamination, ANI, islands and gene content are refused by name, not left empty |
+| Input-type guard | a proteome on the assembly path fabricates rather than fails — GC 35.36% from glycine and cysteine vs the real 38.15%. Both directions now refuse above 200 residues |
 
 ## Environment gotchas that have cost real time
 

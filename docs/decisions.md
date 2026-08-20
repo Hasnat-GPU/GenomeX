@@ -251,3 +251,65 @@ that was never this marker's to begin with.
 **Rejected:** treating the disagreement as a fungal quirk and special-casing
 eukaryotic lineages. The rule is not about eukaryotes. It is about marker sets
 containing paralogous families, which any sufficiently large set will.
+
+## 16. A proteome is a different input, not a genome with holes
+
+Protein FASTA input gets its own result type, its own JSON key (`proteomes`),
+and its own report section. It is not a `GenomeResult` with the assembly fields
+left empty.
+
+**Why:** every downstream consumer of `genomes` — the report, the comparative
+step, the benchmark harnesses — assumes an assembly behind each entry. An entry
+that satisfies that assumption syntactically and violates it semantically is the
+worst of the three options, because nothing fails. A proteome fed through
+`Assembly.load` produces one "contig" per protein, a genome "size" that is a
+residue count, and a GC content computed from glycine and cysteine: on the
+*S. cerevisiae* proteome, **35.36% against that genome's real 38.15%**. In
+range, plausible, and wrong.
+
+The same reasoning drives what the report *says*. Contamination, ANI and islands
+are listed with the reason each cannot be computed, rather than omitted. An
+absent contamination section reads as "we looked and found nothing", which is a
+stronger claim than any this input supports.
+
+The `not_measured` block separates `impossible` from `unimplemented`, and the
+distinction is load-bearing. Clustering proteomes into orthogroups needs no
+nucleotides — MMseqs2 would do it today. What stops it is that the comparative
+step attributes every unique gene to a contig and a coordinate. Calling that
+"impossible" would dress a fact about this code as a fact about biology.
+
+**Rejected:** auto-detecting the input type from the file and routing silently.
+The two paths answer different questions and carry different guarantees, so
+which one ran must be visible in the command the user typed, not inferred from
+the file they passed. Alphabet detection is still used, but only to *refuse* —
+never to switch paths.
+
+**Rejected:** a shared `usable_for_comparative_analysis` boolean across both
+result types. Boolean-shaped code is how the unassessed case came out green on
+the assembly path for as long as it did: `undetermined` is not `likely`, so
+`verdict != "likely"` passed it. Three states, or the absence of a check reads
+as the success of one.
+
+## 17. Refuse the wrong file type; never guess which one it is
+
+Both input paths test the residue alphabet and refuse the other's file. The
+discriminator is the share of residues that have no nucleotide meaning under any
+IUPAC reading — E, F, I, L, P, Q, X, Z, J, O.
+
+**Why:** the obvious test, "what fraction of this is ACGTU", fails on ordinary
+input. A scaffolded assembly padded with N scores 0.80, so any threshold a
+proteome clears would reject a real genome. Measured on the protein-only
+alphabet instead: *S. cerevisiae* proteome 0.3535, its genome 0.0000, a
+bacterial assembly 0.0000, a 20%-N scaffold 0.0000. The populations are 0.35
+apart, so the exact cutoff is not load-bearing.
+
+Below 200 residues the test abstains rather than answers. Sixteen of the
+twenty-six letters are legal nucleotide ambiguity codes — M, K, V and S are
+methionine, lysine, valine and serine *and* A/C, G/T, A/C/G, G/C — so a short
+peptide can be entirely nucleotide-legal by chance. `MKVAAGCGTS` is. This is the
+same abstention as `min_contigs_for_zscores`: below the sample size where a
+statistic discriminates, do not claim it does.
+
+**Rejected:** refusing on the file extension. `.fasta` is used for both, and an
+extension is a claim by the person who named the file rather than a property of
+its contents. Extension is a hint; alphabet is the fact.

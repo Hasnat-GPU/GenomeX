@@ -2,6 +2,8 @@
 
 Per genome:   stats -> gene calls -> single-copy markers -> contamination
 Per pair:     ANI -> orthogroups -> strain-unique genes with causes attached
+Per proteome: single-copy markers only -- see `analyze_proteome`, which exists
+              to make the missing two-thirds explicit rather than empty.
 
 The link between the two halves is deliberate.  Contamination analysis produces
 a set of suspect contigs; the comparative analysis consumes it, so any gene-content
@@ -30,6 +32,7 @@ from .contamination import ContaminationResult, detect_contamination, write_cont
 from .fasta import Assembly, assembly_stats
 from .genes import GeneCalls, predict_genes
 from .markers import Lineage, MarkerResult, scan_markers, write_marker_table
+from .proteome import NOT_MEASURED, Proteome, assert_nucleotide
 from .runtime import Runtime
 
 DEFAULT_LINEAGE = Path.home() / "genomex-work" / "db" / "bacteria_odb10"
@@ -75,17 +78,35 @@ class GenomeResult:
             completeness_grade = "low"
             reasons.append(f"completeness {m.completeness}% -- assembly is missing core genes")
 
-        if c.verdict in ("likely",):
+        # "undetermined" is not "clean". A finished single-replicon genome has
+        # too few scorable contigs for composition statistics and abstains here;
+        # before this branch existed it fell through to `usable: True` with the
+        # reason "single-organism composition" -- a positive claim about a
+        # measurement that never ran. None of the 72 benchmark genomes reach it,
+        # which is exactly why it survived.
+        assessed = c.verdict in ("clean", "possible", "likely")
+        if c.verdict == "likely":
             reasons.append("composition indicates more than one organism")
         elif c.verdict == "possible":
             reasons.append("composition shows minor foreign signal")
+        elif not assessed:
+            why = c.reasons[0] if c.reasons else "no reason recorded"
+            reasons.append(f"composition was not assessed: {why}")
 
-        usable = completeness_grade != "low" and c.verdict != "likely"
+        if completeness_grade == "low":
+            usable = False
+        elif not assessed:
+            usable = None  # not False: nothing was found wrong, nothing was checked
+        else:
+            usable = c.verdict != "likely"
+
+        if not reasons:
+            reasons.append("complete single-copy core, single-organism composition")
         return {
             "usable_for_comparative_analysis": usable,
             "completeness_grade": completeness_grade,
             "contamination_verdict": c.verdict,
-            "reasons": reasons or ["complete single-copy core, single-organism composition"],
+            "reasons": reasons,
         }
 
 
@@ -102,6 +123,9 @@ def analyze_genome(
     t0 = time.time()
     path = Path(path)
     asm = Assembly.load(path)
+    # Before anything measures this file. A proteome reaching assembly_stats is
+    # not an error downstream, it is a plausible wrong answer -- see NotAnAssembly.
+    assert_nucleotide((c.seq for c in asm.contigs), path)
     stats = assembly_stats(asm)
     outdir = Path(outdir) / asm.name
     outdir.mkdir(parents=True, exist_ok=True)
@@ -137,6 +161,106 @@ def analyze_genome(
         outdir=outdir,
         seconds=time.time() - t0,
         sha256=asm.sha256(),
+    )
+
+
+@dataclass
+class ProteomeResult:
+    """What a protein FASTA can support: completeness and duplication.
+
+    Deliberately not a `GenomeResult` with empty fields. The two carry different
+    guarantees, and a type that can be either invites code that forgets which one
+    it is holding.
+    """
+
+    name: str
+    path: Path
+    proteome: Proteome
+    stats: dict
+    markers: MarkerResult
+    outdir: Path
+    seconds: float = 0.0
+    sha256: str = ""
+
+    def summary(self) -> dict:
+        return {
+            "name": self.name,
+            "input": str(self.path),
+            "input_type": "proteome",
+            "sha256": self.sha256,
+            "seconds": round(self.seconds, 1),
+            "proteins": self.stats,
+            "markers": self.markers.summary(),
+            "not_measured": NOT_MEASURED,
+            "quality_call": self.quality_call(),
+        }
+
+    def quality_call(self) -> dict:
+        """Completeness only, and scoped to what it actually measures.
+
+        On an assembly, low completeness means the assembly is missing core
+        genes. On a supplied proteome it means the *proteome* is -- which may be
+        the assembly, or may be the gene caller that produced the file. GenomeX
+        did not call these genes and cannot tell the two apart, so it says both.
+        """
+        m = self.markers
+        reasons: list[str] = []
+        if m.completeness >= 95:
+            grade = "high"
+        elif m.completeness >= 90:
+            grade = "acceptable"
+            reasons.append(f"completeness {m.completeness}% is below the 95% comfort line")
+        else:
+            grade = "low"
+            reasons.append(
+                f"completeness {m.completeness}% -- this proteome is missing core genes. "
+                "GenomeX did not call these genes, so it cannot say whether the assembly "
+                "lacks them or the gene caller missed them"
+            )
+        if m.duplication_percent >= 5:
+            reasons.append(
+                f"{m.duplication_percent}% of markers appear more than once. On an "
+                "assembly this is the contamination signal; on a proteome it is equally "
+                "consistent with redundant gene models, and there are no contigs to tell "
+                "them apart"
+            )
+        return {
+            # Not False: False would read as "we checked and it is unsuitable".
+            "usable_for_comparative_analysis": None,
+            "completeness_grade": grade,
+            "contamination_verdict": "not_measured",
+            "reasons": reasons or ["complete single-copy core for this lineage"],
+            "scope": "completeness and duplication only -- see not_measured",
+        }
+
+
+def analyze_proteome(
+    path: str | Path,
+    outdir: str | Path,
+    rt: Runtime,
+    lineage: Lineage,
+) -> ProteomeResult:
+    t0 = time.time()
+    path = Path(path)
+    prot = Proteome.load(path)
+    outdir = Path(outdir) / prot.name
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    # No contig map, deliberately: `parse_domtbl` then writes the unknown-contig
+    # sentinel and sets `contigs_known=False`, which is what makes every
+    # contig-shaped accessor downstream refuse instead of guessing.
+    markers = scan_markers(path, lineage, outdir, rt)
+    write_marker_table(markers, outdir / "markers.tsv")
+
+    return ProteomeResult(
+        name=prot.name,
+        path=path,
+        proteome=prot,
+        stats=prot.stats(),
+        markers=markers,
+        outdir=outdir,
+        seconds=time.time() - t0,
+        sha256=prot.sha256(),
     )
 
 
@@ -215,12 +339,19 @@ class PipelineResult:
     runtime: Runtime | None = None
     outdir: Path = Path(".")
     seconds: float = 0.0
+    #: Proteome inputs are kept in their own list rather than mixed into
+    #: `genomes`. Every existing consumer of `genomes` -- the report, the
+    #: comparative step, the benchmark harnesses -- assumes an assembly behind
+    #: each entry. A proteome entry with `assembly` stubbed to zeroes would
+    #: satisfy that assumption syntactically and lie to it semantically.
+    proteomes: list["ProteomeResult"] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
             "genomex_version": __import__("genomex").__version__,
             "seconds": round(self.seconds, 1),
             "genomes": [g.summary() for g in self.genomes],
+            "proteomes": [p.summary() for p in self.proteomes],
             "pangenome": self.pangenome.summary() if self.pangenome else None,
             "pairs": [p.summary() for p in self.pairs],
             "provenance": self.runtime.provenance() if self.runtime else {},
@@ -231,6 +362,52 @@ class PipelineResult:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
         return path
+
+
+def run_proteome_pipeline(
+    inputs: list[str | Path],
+    outdir: str | Path,
+    *,
+    lineage_path: str | Path = DEFAULT_LINEAGE,
+    threads: int | None = None,
+    log=print,
+) -> PipelineResult:
+    """Marker scan over supplied proteomes. No Prodigal, no contigs, no pairs.
+
+    Requires only hmmsearch. Demanding Prodigal here would refuse to run on a
+    machine that has no gene caller and does not need one.
+    """
+    t0 = time.time()
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    rt = Runtime()
+    if threads:
+        rt.threads = threads
+    rt.require("hmmsearch")
+
+    lineage = Lineage.load(lineage_path)
+    log(f"lineage: {lineage.name} ({lineage.n_markers} markers)")
+
+    results: list[ProteomeResult] = []
+    for path in inputs:
+        log(f"[{len(results) + 1}/{len(inputs)}] {Path(path).name}")
+        r = analyze_proteome(path, outdir / "proteomes", rt, lineage)
+        log(
+            f"    {r.stats['n_proteins']} proteins, {r.stats['mean_protein_aa']} aa mean "
+            f"| completeness {r.markers.completeness}% dup {r.markers.duplication_percent}% "
+            f"({r.seconds:.0f}s)"
+        )
+        results.append(r)
+
+    log(
+        "not measured from a proteome: "
+        + ", ".join(sorted(NOT_MEASURED))
+        + " -- see the report for why"
+    )
+    return PipelineResult(
+        genomes=[], proteomes=results, runtime=rt, outdir=outdir,
+        seconds=time.time() - t0,
+    )
 
 
 def run_pipeline(

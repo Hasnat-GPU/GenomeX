@@ -187,12 +187,24 @@ Say the analysis cannot answer, and why, when:
   masquerade as strain-unique genes in the *other* genome;
 - ANI is `null` and a same-species claim is requested;
 - a *function* is requested for a unique gene. GenomeX does not annotate function.
-  Unique means "no sequence cluster partner", not "novel" and not "characterised".
+  Unique means "no sequence cluster partner", not "novel" and not "characterised";
+- **contamination, ANI, islands or gene content are requested from a `proteins`
+  run.** A proteome has no contigs, so none of them were measured. The report
+  lists each with its reason under `not_measured`; quote that, do not infer a
+  clean result from an absent section. Marker duplication on a proteome is not
+  a contamination signal -- redundant gene models produce the same number.
 
 ## What GenomeX does not do
 
-No read assembly (input is assemblies), no functional annotation, no taxonomic
-naming of a contaminant, no rRNA/tRNA calling, no plasmid-vs-chromosome
-classification beyond the composition heuristic above, and no eukaryote-aware gene
-calling — Prodigal is prokaryotic, so a fungal genome needs a different caller
-before these numbers mean anything.
+No read assembly (input is assemblies or, via `proteins`, a proteome), no
+functional annotation, no taxonomic naming of a contaminant, no rRNA/tRNA
+calling, no plasmid-vs-chromosome classification beyond the composition
+heuristic above, and no eukaryote-aware gene calling — Prodigal is prokaryotic,
+so a fungal *genome* needs a different caller before these numbers mean
+anything.
+
+A fungal *proteome* does not: `proteins` scores one directly and agrees with
+BUSCO 5.8.3 on 758/758 `fungi_odb10` markers. That is completeness and
+duplication only. Everything downstream still needs contigs, so a `proteins` run
+answers "how complete is this gene set" and refuses every other question by
+name.
