@@ -49,6 +49,25 @@ All notable changes to this project are documented here. Format follows
 
 ### Fixed
 
+- **A protein is now counted only under the marker it scores highest against**,
+  and a protein already complete under one marker is no longer also a fragment
+  of another. Both rules run before the 85%-retention step, which is where BUSCO
+  runs them; the order matters, because a hit the cross-marker rule removes must
+  not first be allowed to set a marker's best score.
+
+  Found by scoring an *S. cerevisiae* proteome against `fungi_odb10`: three
+  AAA-ATPases each clear the Pex1 marker's cutoff as well as their own family's,
+  so Pex1 was reported duplicated when it is single. That was the only marker of
+  758 on which GenomeX disagreed with BUSCO 5.8.3 over the same proteome. With
+  the rule it is 758/758.
+
+  The bacterial benchmark could not see this: bacterial core markers are largely
+  ribosomal and rarely share a protein between families. Re-deriving all 72
+  genomes changes 1 marker call of 9,002 under `bacteria_odb10` and 5 of 49,963
+  under `burkholderiales_odb10`, and the demo set's 496/496 agreement with BUSCO
+  is byte-identical in both `-m proteins` and `-m genome` modes.
+  `docs/decisions.md` #15.
+
 - `docs/example-report.html` was still the v0.1.1 rendering and showed
   `GCA_040948545.1` as "likely contaminated" — a verdict neither v0.2.0 nor the
   current code produces. Regenerated from `demo.sh`. The demo's contamination

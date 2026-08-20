@@ -216,3 +216,38 @@ defect was the inference drawn from the flag, not the flag.
 `replicon_candidate`. That label means "plasmid or contaminant, unresolvable by
 composition", and here the marker evidence *does* resolve it. Collapsing a
 resolved case into an unresolved one throws away an answer the tool has.
+
+## 15. A protein belongs to one marker
+
+A protein that clears the score cutoff of several markers is counted only under
+the one it scores highest against, and a protein already complete under one
+marker is not also a fragment of another. Both run before the 85%-retention
+step, which is where BUSCO runs them.
+
+**Why:** the retention rule looks *within* a marker and asks whether a second
+hit is a real copy or a distant paralog. It cannot see the other direction — a
+hit that is a perfectly good protein which simply belongs to a different marker.
+In `fungi_odb10`, three AAA-ATPases each clear the cutoff of the Pex1 marker as
+well as of the AAA-ATPase marker, and score higher against the latter. Without
+this rule Pex1 is reported duplicated when it is single.
+
+That was the only marker of 758 on which GenomeX disagreed with BUSCO 5.8.3
+scoring the same *S. cerevisiae* proteome. With the rule it is 758/758.
+
+The rule was missing because the bacterial benchmark could not see it. Bacterial
+core markers are largely ribosomal and rarely share a protein between families;
+re-deriving all 72 genomes changes 1 marker call of 9,002 under
+`bacteria_odb10` and 5 of 49,963 under `burkholderiales_odb10`, and the demo
+set's 496/496 agreement is byte-identical either way. A defect invisible in one
+lineage and decisive in another is an argument for validating against more than
+one, not for assuming the first was representative.
+
+**Rejected:** applying it after the retention step, which is where it would
+naturally have gone in this code. BUSCO's order is the other way round, and
+order changes the answer: a hit removed by the cross-marker rule must not first
+be allowed to set a marker's best score, or the 85% floor is computed from a hit
+that was never this marker's to begin with.
+
+**Rejected:** treating the disagreement as a fungal quirk and special-casing
+eukaryotic lineages. The rule is not about eukaryotes. It is about marker sets
+containing paralogous families, which any sufficiently large set will.

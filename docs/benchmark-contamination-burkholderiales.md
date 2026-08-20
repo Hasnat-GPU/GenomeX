@@ -19,7 +19,7 @@ Both tools read the same FASTA, so these are not estimates. A gap here is a bug,
 
 ## Completeness
 
-Mean absolute difference **0.63 points** over 72 genomes (GenomeX minus CheckM2: min -20.29, max +0.01).
+Mean absolute difference **0.64 points** over 72 genomes (GenomeX minus CheckM2: min -20.73, max +0.01).
 
 | difference | genomes |
 |---|---|
@@ -32,9 +32,9 @@ Largest differences:
 
 | genome | GenomeX | CheckM2 | difference |
 |---|---|---|---|
-| GCA_001725945.1 | 64.39% | 84.68% | -20.29 |
+| GCA_001725945.1 | 63.95% | 84.68% | -20.73 |
 | GCA_040948815.1 | 86.48% | 94.49% | -8.01 |
-| GCA_022041995.1 | 94.91% | 100.0% | -5.09 |
+| GCA_022041995.1 | 94.77% | 100.0% | -5.23 |
 | GCA_040965815.1 | 98.84% | 99.99% | -1.15 |
 | GCA_000519245.1 | 99.13% | 100.0% | -0.87 |
 | GCA_040948745.1 | 99.27% | 100.0% | -0.73 |
@@ -111,7 +111,7 @@ genome-level detection went from 0/4 pairs to 4/4 at 2% donor, and 3/4 to 4/4 at
 | recall at CheckM2 >= 5% | 0.00 (0/4) | 0.25 (1/4) |
 | precision at CheckM2 >= 5% | 0.00 | 0.11 |
 | corr(cross-contig duplication %, CheckM2 %) | -0.026 | 0.161 |
-| completeness mean abs difference | 0.55 pt | 0.63 pt |
+| completeness mean abs difference | 0.55 pt | 0.64 pt |
 
 The same three genomes are missed, and they are missed for the same reason.
 
@@ -122,6 +122,16 @@ arm that fired on 12.5% of shreddings of finished genomes, and it took
 `GCF_009362735.1` with it at 124 markers. At 688 that genome is still called
 `likely`, which is the one place in this comparison where the deeper set now buys
 something the shallow one does not.
+
+The completeness figure moved too, 0.63 pt to 0.64 pt, and for an unrelated
+reason worth naming rather than leaving as drift. Validating the marker scan
+against a eukaryotic lineage exposed a BUSCO rule this code never had: a protein
+is counted only under the marker it scores highest against (`decisions.md` #15).
+Applying it costs `GCA_001725945.1` 0.44 points of completeness and
+`GCA_022041995.1` 0.14, because in each case a marker's only evidence was a
+protein that belongs to a different marker. Five marker calls of 49,963 change
+across the collection, no verdict moves, and agreement with real BUSCO on the
+demo set stays 496/496.
 
 ## The two tools are not measuring the same thing
 
@@ -181,7 +191,7 @@ When the lineage *is* known, the deeper set is better on every measurement this
 repository controls: finer contamination resolution, detection down to 2% on
 constructed mixtures, and duplication figures that are not inflated by
 out-of-lineage paralogy. It does not improve agreement with CheckM2, and it
-costs 0.08 points of completeness agreement and about five times the scan time.
+costs 0.09 points of completeness agreement and about five times the scan time.
 
 Pass it explicitly:
 

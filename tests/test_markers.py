@@ -203,3 +203,81 @@ def test_hmm_coverage_not_sequence_envelope_decides_completeness(tmp_path):
     res = parse_domtbl(_write(tmp_path, [" ".join(f)]), LINEAGE, {})
     assert res.fragmented == ["m2"]
     assert res.hits[0].matched_aa == 120
+
+
+# ------------------------------------- one protein belongs to one marker
+
+def test_a_protein_counts_only_for_the_marker_it_scores_highest_against(tmp_path):
+    """The fungal defect, in miniature.
+
+    One protein clears the score cutoff of two markers. It is really m2's -- it
+    scores higher there -- so counting it as a second copy of m1 reports m1
+    duplicated when it is single. Found on S. cerevisiae, where three AAA-ATPases
+    each cleared the Pex1 cutoff as well as their own family's.
+    """
+    p = _write(tmp_path, [
+        _row("c1_1", "m1", 230.0, 1, 99),    # m1's genuine single copy
+        _row("c1_2", "m1", 216.0, 1, 99),    # clears m1, but...
+        _row("c1_2", "m2", 238.0, 1, 199),   # ...scores higher against m2
+    ])
+    res = parse_domtbl(p, LINEAGE, {})
+    assert res.single == ["m1", "m2"] or set(res.single) == {"m1", "m2"}
+    assert res.duplicated == []
+    calls = {h.busco_id: h.protein_id for h in res.hits}
+    assert calls["m1"] == "c1_1"
+    assert calls["m2"] == "c1_2"
+
+
+def test_the_rule_runs_before_retention_not_after(tmp_path):
+    """Order matters, and BUSCO's order is this one.
+
+    c1_2 is within 85% of m1's best (216 >= 0.85 * 230), so retention keeps it;
+    only the cross-marker rule removes it. Were the two applied the other way
+    round, m1's best hit would be recomputed after c1_2 had already gone and a
+    third, weaker hit could survive a threshold it should not have.
+    """
+    p = _write(tmp_path, [
+        _row("c1_1", "m1", 230.0, 1, 99),
+        _row("c1_2", "m1", 216.0, 1, 99),
+        _row("c1_2", "m2", 238.0, 1, 199),
+        _row("c1_3", "m1", 190.0, 1, 99),    # below 0.85*230=195.5, must stay dropped
+    ])
+    res = parse_domtbl(p, LINEAGE, {})
+    assert res.duplicated == []
+    assert {h.protein_id for h in res.hits if h.busco_id == "m1"} == {"c1_1"}
+
+
+def test_a_complete_claim_outranks_a_fragmented_one(tmp_path):
+    """A protein good enough to complete one marker is not also another's fragment.
+
+    m3 expects 100 profile positions (sigma 5), so 40 is fragmented; m1 expects
+    the same and 99 is complete. The protein is m1's, and m3 keeps nothing.
+    """
+    p = _write(tmp_path, [
+        _row("c1_1", "m1", 120.0, 1, 99),   # complete under m1
+        _row("c1_1", "m3", 300.0, 1, 40),   # higher score, but only fragmented
+    ])
+    res = parse_domtbl(p, LINEAGE, {})
+    assert res.single == ["m1"]
+    assert "m3" in res.missing
+    assert res.fragmented == []
+
+
+def test_ties_are_broken_deterministically(tmp_path):
+    """Equal scores must not let dict order decide which marker keeps the protein."""
+    rows = [_row("c1_1", "m1", 200.0, 1, 99), _row("c1_1", "m3", 200.0, 1, 99)]
+    first = parse_domtbl(_write(tmp_path, rows), LINEAGE, {})
+    second = parse_domtbl(_write(tmp_path, list(reversed(rows))), LINEAGE, {})
+    assert first.single == second.single
+    assert [h.busco_id for h in first.hits] == [h.busco_id for h in second.hits]
+
+
+def test_an_unshared_protein_is_untouched(tmp_path):
+    """The rule must only fire on proteins claimed by more than one marker."""
+    p = _write(tmp_path, [
+        _row("c1_1", "m1", 120.0, 1, 99),
+        _row("c2_1", "m1", 118.0, 1, 99),   # genuine second copy, different protein
+    ])
+    res = parse_domtbl(p, LINEAGE, {"c1_1": "c1", "c2_1": "c2"})
+    assert res.duplicated == ["m1"]
+    assert sorted(h.contig for h in res.hits) == ["c1", "c2"]

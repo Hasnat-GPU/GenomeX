@@ -188,6 +188,47 @@ def _union_length(intervals: list[tuple[int, int]]) -> int:
     return sum_hmm_len(intervals)
 
 
+def _resolve_cross_marker_claims(scored: list[MarkerHit]) -> list[MarkerHit]:
+    """A protein belongs to one marker: the one it scores highest against.
+
+    Two of BUSCO's rules, which act across markers rather than within one.
+    (BUSCO 5 hmmer.py, `_remove_lower_ranked_duplicates` and
+    `_remove_remaining_duplicate_matches`, both run by `_remove_duplicates`
+    before the 85%-retention step -- hence the order here.)
+
+    * **Rank first.** A protein good enough to be a complete copy of something is
+      not also a fragment of something else, so its fragmented claims go.
+    * **Then best score.** Among the claims left at its rank, the protein is kept
+      only under the marker it scores highest against.
+
+    Large paralogous families are what this is for. In `fungi_odb10`, three
+    AAA-ATPases each clear the score cutoff of the Pex1 marker *and* of the
+    AAA-ATPase marker, scoring higher against the latter. Without this rule they
+    count as extra copies of Pex1 and the marker is reported duplicated when it
+    is single -- measured on S. cerevisiae, the only marker of 758 on which
+    GenomeX and BUSCO 5.8.3 disagreed.
+
+    It is nearly inert on bacteria, which is why the 496/496 bacterial agreement
+    held without it: re-deriving all 72 genomes changes 1 marker of 9,002 under
+    `bacteria_odb10` and 5 of 49,963 under `burkholderiales_odb10`. Bacterial
+    core markers are largely ribosomal and rarely share a protein between
+    families the way eukaryotic ATPase families do.
+
+    Ties are broken on `busco_id` so the result does not depend on dict order.
+    """
+    by_protein: dict[str, list[MarkerHit]] = defaultdict(list)
+    for h in scored:
+        by_protein[h.protein_id].append(h)
+
+    keep: list[MarkerHit] = []
+    for _protein, claims in by_protein.items():
+        complete = [h for h in claims if h.status == "complete"]
+        ranked = complete or claims
+        winner = max(ranked, key=lambda h: (h.score, h.busco_id))
+        keep.append(winner)
+    return keep
+
+
 def parse_domtbl(
     path: str | Path,
     lineage: Lineage,
@@ -203,12 +244,16 @@ def parse_domtbl(
     2. classify each surviving hit complete or fragmented from its HMM-profile
        coverage against the marker's length cutoff (BUSCO's odb10 rule is
        ``zeta = (length - size) / sigma``, fragmented when ``zeta > 2``);
-    3. per marker, drop hits scoring below ``bitscore_retention`` of that
+    3. resolve claims across markers, so each protein belongs to exactly one
+       (see :func:`_resolve_cross_marker_claims`);
+    4. per marker, drop hits scoring below ``bitscore_retention`` of that
        marker's best hit -- only then count copies.
 
-    Step 3 is what separates a genuine second copy from a distant paralog that
+    Step 4 is what separates a genuine second copy from a distant paralog that
     happened to clear a permissive cutoff. Without it a marker whose best hit
-    scores 297 also counts hits at 17 and 19 as copies.
+    scores 297 also counts hits at 17 and 19 as copies. Step 3 catches the other
+    direction: a protein that is really *another* marker's, counted here as a
+    second copy because it cleared this marker's cutoff too.
     """
     # (busco_id, protein_id) -> (full_sequence_score, [(hmm_from, hmm_to), ...])
     acc: dict[tuple[str, str], tuple[float, list[tuple[int, int]]]] = {}
@@ -246,6 +291,10 @@ def parse_domtbl(
                 status=status,
             )
         )
+
+    # One protein may only be claimed by one marker. BUSCO does this *before*
+    # the retention step, so the order here is its order.
+    scored = _resolve_cross_marker_claims(scored)
 
     # Retain only matches within `bitscore_retention` of each marker's best hit.
     best: dict[str, float] = {}
