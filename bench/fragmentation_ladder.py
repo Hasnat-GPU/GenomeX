@@ -15,7 +15,7 @@ develop against without that hazard, because the right answer is known a priori
 from how the input was constructed.
 
 Usage:
-    python bench/fragmentation_ladder.py --genomes A.fna B.fna --out ladder.tsv
+    python bench/fragmentation_ladder.py --genomes A.fna B.fna --seeds 8 --out ladder.tsv
 """
 
 from __future__ import annotations
@@ -120,55 +120,92 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=Path("bench/fragmentation_ladder.tsv"))
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument(
+        "--seeds", type=int, default=1,
+        help="independent shreddings per rung. One draw per rung is not a rate: "
+             "a rung that fires on 1 shredding in 8 looks identical to a rung "
+             "that always fires when you only ever shred once.",
+    )
+    ap.add_argument(
         "--run-dir", type=Path, default=None,
         help="a completed GenomeX --outdir; supplies the marker evidence the "
              "detector needs to tell a plasmid from a contaminant",
     )
     args = ap.parse_args()
+    seeds = [args.seed + k for k in range(max(1, args.seeds))]
 
     rows = [
-        "genome\trequested_pieces\tscored_contigs\tverdict\tsuspect_contigs\t"
-        "suspect_fraction_pct\tbimodal\tmean_contig_kb"
+        "genome\tseed\trequested_pieces\tscored_contigs\tverdict\tsuspect_contigs\t"
+        "suspect_fraction_pct\treplicon_contigs\tflagged_groups\tcarries_core_markers\t"
+        "bimodal\tmean_contig_kb"
     ]
-    flips = 0
-    per_genome: dict[str, list[str]] = {}
+    # (genome, rung) -> verdicts across seeds, and how many of the false calls
+    # came from the `carries_core_markers` arm of the call tree.
+    draws: dict[tuple[str, int], list[str]] = {}
+    branch_hits = 0
+    total_false = 0
 
     for path in args.genomes:
         asm = Assembly.load(path)
-        verdicts = []
         print(f"\n{asm.name}: {len(asm.contigs)} contigs, {asm.total_bp / 1e6:.2f} Mb")
         markers = load_marker_positions(args.run_dir, asm.name) if args.run_dir else []
         if args.run_dir and not markers:
             print(f"  warning: no marker scan found for {asm.name}; "
                   f"the plasmid/contaminant distinction is disabled")
         for n in RUNGS:
-            frag, spans = shred_with_spans(asm, n, seed=args.seed)
-            counts = marker_counts_for(spans, markers) if markers else None
-            res = detect_contamination(frag, contig_marker_counts=counts)
-            scored = res.params.get("contigs_scored", 0)
-            mean_kb = frag.total_bp / max(1, len(frag.contigs)) / 1000
-            verdicts.append(res.verdict)
-            rows.append(
-                f"{asm.name}\t{n}\t{scored}\t{res.verdict}\t{res.n_suspect_contigs}\t"
-                f"{round(100 * res.suspect_fraction, 2)}\t{res.bins.get('bimodal')}\t{mean_kb:.1f}"
-            )
-            print(
-                f"  {n:>5} pieces -> {scored:>4} scored | {res.verdict:<12} "
-                f"suspect {res.n_suspect_contigs:>3} ({100 * res.suspect_fraction:5.2f}%) "
-                f"bimodal={res.bins.get('bimodal')}"
-            )
-        per_genome[asm.name] = verdicts
-        if len(set(verdicts)) > 1:
-            flips += 1
+            line = f"  {n:>5} pieces:"
+            for seed in seeds:
+                frag, spans = shred_with_spans(asm, n, seed=seed)
+                counts = marker_counts_for(spans, markers) if markers else None
+                res = detect_contamination(frag, contig_marker_counts=counts)
+                scored = res.params.get("contigs_scored", 0)
+                mean_kb = frag.total_bp / max(1, len(frag.contigs)) / 1000
+                replicons = sum(1 for v in res.contigs if v.call == "replicon_candidate")
+                carries = sum(
+                    1 for v in res.contigs
+                    if v.call == "contaminant_candidate" and "carries_core_markers" in v.flags
+                )
+                draws.setdefault((asm.name, n), []).append(res.verdict)
+                if res.verdict != "clean":
+                    total_false += 1
+                    branch_hits += carries > 0
+                rows.append(
+                    f"{asm.name}\t{seed}\t{n}\t{scored}\t{res.verdict}\t{res.n_suspect_contigs}\t"
+                    f"{round(100 * res.suspect_fraction, 2)}\t{replicons}\t"
+                    f"{res.params.get('flagged_groups', 0)}\t{carries}\t"
+                    f"{res.bins.get('bimodal')}\t{mean_kb:.1f}"
+                )
+                tag = "." if res.verdict == "clean" else res.verdict[0].upper()
+                line += f" {tag}"
+            print(line)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
-    print(f"\n{'=' * 62}")
-    print(f"genomes with a verdict that changes down the ladder: {flips}/{len(per_genome)}")
-    for name, vs in per_genome.items():
-        mark = "FLIPS" if len(set(vs)) > 1 else "stable"
-        print(f"  {mark:<7} {name:<22} {' -> '.join(vs)}")
+    # Every input here is one finished genome cut into pieces, so `clean` is the
+    # only correct answer at every rung. Anything else is a false positive
+    # manufactured by fragmentation, which is the whole point of the harness.
+    n_draws = sum(len(v) for v in draws.values())
+    n_false = sum(sum(1 for x in v if x != "clean") for v in draws.values())
+    print(f"\n{'=' * 68}")
+    print(f"draws: {n_draws} ({len(args.genomes)} genomes x {len(RUNGS)} rungs "
+          f"x {len(seeds)} shreddings)")
+    print(f"false positives: {n_false}/{n_draws} = {100 * n_false / max(1, n_draws):.1f}%")
+    if total_false:
+        print(f"  of which involve a carries_core_markers call: "
+              f"{branch_hits}/{total_false}")
+    print("\nper rung:")
+    for n in RUNGS:
+        vs = [x for (_g, r), v in draws.items() if r == n for x in v]
+        bad = sum(1 for x in vs if x != "clean")
+        print(f"  {n:>5} pieces  {bad:>3}/{len(vs):<3} false  "
+              f"({100 * bad / max(1, len(vs)):5.1f}%)")
+    print("\nper genome:")
+    for path in args.genomes:
+        name = path.stem
+        vs = [x for (g, _r), v in draws.items() if g == name for x in v]
+        bad = sum(1 for x in vs if x != "clean")
+        mark = "clean" if bad == 0 else "FALSE"
+        print(f"  {mark:<6} {name:<22} {bad:>3}/{len(vs):<3}")
     print(f"\nwritten: {args.out}")
     return 0
 

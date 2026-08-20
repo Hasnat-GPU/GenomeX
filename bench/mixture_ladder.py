@@ -205,6 +205,7 @@ def evaluate(mix: Mixture, total_markers: int) -> dict:
     by_len = {c.name: c.length for c in mix.assembly.contigs}
     suspect = res.suspect_contig_names()
     replicon = {c.name for c in res.contigs if c.call == "replicon_candidate"}
+    host_region = {c.name for c in res.contigs if c.call == "atypical_host_region"}
     truth = mix.donor_contigs
 
     hit_bp = sum(by_len[n] for n in suspect & truth)
@@ -219,6 +220,10 @@ def evaluate(mix: Mixture, total_markers: int) -> dict:
         "precision_bp": round(hit_bp / suspect_bp, 3) if suspect_bp else None,
         "host_false_pos": len(suspect - truth),
         "donor_as_replicon": len(replicon & truth),
+        # Donor contigs excused as the host's own atypical chromosome. This is
+        # the price of the sole-copy rule; it must be paid in view, not hidden
+        # inside a recall figure that only counts what was caught.
+        "donor_as_host_region": len(host_region & truth),
         "duplicated_markers": n_dup,
         "duplication_pct": round(100 * n_dup / max(1, total_markers), 2),
     }
@@ -243,7 +248,8 @@ def main() -> int:
     cols = [
         "host", "donor", "requested_pct", "donor_pct", "verdict", "donor_contigs",
         "recall_ctg", "recall_bp", "precision_bp", "host_false_pos",
-        "donor_as_replicon", "duplicated_markers", "duplication_pct",
+        "donor_as_replicon", "donor_as_host_region", "duplicated_markers",
+        "duplication_pct",
     ]
     rows = ["\t".join(cols)]
     caught: list[tuple[float, bool]] = []
@@ -260,7 +266,7 @@ def main() -> int:
         print(f"\n{h_acc} ({host.total_bp/1e6:.2f} Mb) <- {d_acc} "
               f"({donor.total_bp/1e6:.2f} Mb), markers {len(hm)}/{len(dm)}")
         print(f"  {'donor%':>7} {'verdict':<12} {'recall_bp':>9} {'prec_bp':>8} "
-              f"{'fp':>4} {'as_repl':>8} {'dup':>4}")
+              f"{'fp':>4} {'as_repl':>8} {'as_host':>8} {'dup':>4}")
         for pct in RUNGS:
             mix = build_mixture(host, donor, hm, dm, pct, seed=args.seed,
                                 host_pieces=args.host_pieces)
@@ -269,12 +275,12 @@ def main() -> int:
                 h_acc, d_acc, pct, m["donor_pct"], m["verdict"], m["donor_contigs"],
                 m["recall_ctg"], m["recall_bp"], m["precision_bp"],
                 m["host_false_pos"], m["donor_as_replicon"],
-                m["duplicated_markers"], m["duplication_pct"],
+                m["donor_as_host_region"], m["duplicated_markers"], m["duplication_pct"],
             ]))
             print(f"  {m['donor_pct']:>7.2f} {m['verdict']:<12} "
                   f"{str(m['recall_bp']):>9} {str(m['precision_bp']):>8} "
                   f"{m['host_false_pos']:>4} {m['donor_as_replicon']:>8} "
-                  f"{m['duplicated_markers']:>4}")
+                  f"{m['donor_as_host_region']:>8} {m['duplicated_markers']:>4}")
             if pct > 0:
                 caught.append((pct, m["verdict"] != "clean"))
 

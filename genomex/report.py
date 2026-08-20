@@ -158,7 +158,10 @@ def render_html(data: dict) -> str:
                 '<div class="note"><b>contaminant_candidate</b> foreign composition with '
                 'displaced core markers &middot; <b>replicon_candidate</b> distinct but '
                 'marker-clean, i.e. plasmid or second chromosome as likely as contaminant '
-                '&middot; <b>marker_conflict</b> shares duplicated core markers while '
+                '&middot; <b>atypical_host_region</b> distinct, but holds this assembly&rsquo;s '
+                'only copies of core markers, so it is this organism&rsquo;s own chromosome '
+                '&mdash; prophage or island, not contamination &middot; '
+                '<b>marker_conflict</b> shares duplicated core markers while '
                 'composition looks native.</div>'
             )
         parts.append("</div>")

@@ -62,9 +62,10 @@ Results: [`docs/benchmark-contamination.md`](../docs/benchmark-contamination.md)
 
 ```bash
 python bench/fragmentation_ladder.py \
-    --genomes ~/genomex-work/data/Bacteria/GCA_000069785.1.fna \
+    --genomes ~/genomex-work/data/Bacteria/GCA_000069785.1.fna ... \
     --run-dir ~/genomex-work/runs/sweep \
-    --out bench/fragmentation_after.tsv
+    --seeds 8 \
+    --out bench/fragmentation_seeds_after.tsv
 ```
 
 Shred one finished genome into 10, 50, 100, 300 and 1000 contigs. Same DNA, same
@@ -77,6 +78,21 @@ follows from how the input was built.
 It is what exposed the length bias in the old detector: 2/15 rungs stable, and a
 correlation of −0.43 between contig score and log length. After the rebuild,
 13/15 and −0.09.
+
+**Use `--seeds`.** Those 15-draw figures are one shredding per rung, and a rung
+that fires on one shredding in five looks identical to a rung that never fires
+when you only shred once. Eight seeds across the eight finished genomes in the
+collection gives 320 draws, and 320 draws showed the post-rebuild detector still
+producing a 12.5% false-positive rate that climbed from 1.6% at 10 pieces to
+26.6% at 1000 — a defect the single-draw ladder had recorded as two anomalies.
+Zero afterwards. Results and mechanism:
+[`docs/benchmark-fragmentation.md`](../docs/benchmark-fragmentation.md).
+
+`fragmentation_before.tsv` and `fragmentation_after.tsv` are the original
+single-draw pair, kept as the record of the null rebuild.
+`fragmentation_seeds_before.tsv` and `fragmentation_seeds_after.tsv` are the
+320-draw pair, and their `before` half was produced from a clean checkout of the
+v0.2.0 tag driven by the current harness, so the two halves differ in one thing.
 
 ## Mixture ladder — constructed recall
 

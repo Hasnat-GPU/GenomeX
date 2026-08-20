@@ -174,3 +174,45 @@ withholding that would test a detector nobody runs.
 **Rejected:** simulating a contaminant from a composition model. The whole
 question is whether real between-genome composition differences are separable,
 and a simulated donor would answer a question about the simulator instead.
+
+## 14. Presence of core markers is not evidence of a second organism
+
+A compositionally distinct group that carries core single-copy markers is called
+a `contaminant_candidate` only when those markers are **duplicated** elsewhere in
+the assembly. When they are the assembly's only copies it is called an
+`atypical_host_region` and excluded from the contamination fraction.
+
+**Why:** the old rule reasoned that plasmids do not carry the universal core, so
+a distinct group that does carry it must be chromosomal, and chromosomal sequence
+with foreign composition must be a second organism. Every step holds except the
+last. Chromosomal sequence in an assembly of one organism is *that organism's*
+chromosome, and a prophage, a genomic island or a GC-skewed region is exactly
+that: native sequence with atypical composition.
+
+The discriminator was there all along and was being discarded. A second organism
+does not merely carry core genes, it carries its **own copies** of a set defined
+to occur once per genome, and those duplicate the host's. Presence is not the
+signal; duplication is.
+
+The cost of the old reading was measurable and large. The family-wise threshold
+admits a compositional outlier on some share of clean assemblies by construction,
+and this arm converted every such outlier into a genome-level verdict. Over 320
+shreddings of eight finished genomes: 40 false positives, 12.5%, rising from 1.6%
+at 10 pieces to 26.6% at 1000. Afterwards, zero — with 292 of the 320 draws still
+flagging outlier groups, so nothing was silenced. Both mixture ladders came back
+bit-for-bit identical, and no donor contig in 48 constructed rows was excused as a
+host region. `docs/benchmark-fragmentation.md`.
+
+It also cost biology. Genes on `contaminant_candidate` contigs are dropped by the
+comparative step as artefacts, so a prophage — the textbook acquisition island —
+was being deleted from the very analysis meant to find it.
+
+**Rejected:** raising the outlier threshold until the ladder came back clean. The
+outliers are real; the assembly does contain compositionally odd sequence, and
+suppressing the flag would hide a true observation to fix a false conclusion. The
+defect was the inference drawn from the flag, not the flag.
+
+**Rejected:** dropping the arm entirely and letting such groups fall through to
+`replicon_candidate`. That label means "plasmid or contaminant, unresolvable by
+composition", and here the marker evidence *does* resolve it. Collapsing a
+resolved case into an unresolved one throws away an answer the tool has.

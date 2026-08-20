@@ -160,6 +160,9 @@ class ContigVerdict:
     # core                  composition matches the assembly and no marker conflict
     # contaminant_candidate compositionally foreign; the real contamination signal
     # replicon_candidate    large and distinct but no displaced markers: plasmid/chromid
+    # atypical_host_region  distinct composition, but holds the assembly's only
+    #                       copies of core markers -- this organism's own
+    #                       chromosome; prophage or island, not contamination
     # marker_conflict       shares duplicated core markers but composition is typical
     call: str = "core"
 
@@ -190,6 +193,10 @@ class ContaminationResult:
                 {"contig": c.name, "length": c.length, "gc_percent": c.gc_percent}
                 for c in self.contigs if c.call == "replicon_candidate"
             ],
+            "atypical_host_regions": [
+                {"contig": c.name, "length": c.length, "gc_percent": c.gc_percent}
+                for c in self.contigs if c.call == "atypical_host_region"
+            ],
             "marker_conflict_contigs": [
                 c.name for c in self.contigs if c.call == "marker_conflict"
             ],
@@ -198,8 +205,11 @@ class ContaminationResult:
         }
 
     def suspect_contig_names(self) -> set[str]:
-        """Contigs believed to be foreign. Excludes plasmid/chromid candidates,
-        whose genes are real biology and must not be written off as artefacts."""
+        """Contigs believed to be foreign.
+
+        Excludes plasmid/chromid candidates and atypical host regions alike:
+        the genes on both are this organism's real biology, and the comparative
+        step writes off everything named here as an artefact."""
         return {c.name for c in self.contigs if c.call == "contaminant_candidate"}
 
     def flagged_contig_names(self) -> set[str]:
@@ -235,6 +245,14 @@ def detect_contamination(
       markers is at least as likely to be a plasmid or a chromid as a
       contaminant.  Composition alone cannot separate those, so it is called a
       `replicon_candidate` and excluded from the contamination fraction.
+    * A compositionally distinct group holding the assembly's *only* copies of
+      part of the single-copy core is this organism's own chromosome: a second
+      organism arrives with its own copies, which duplicate the host's.  It is
+      called an `atypical_host_region` -- a prophage or island candidate -- and
+      likewise excluded.  Calling it contamination instead turned every outlier
+      the family-wise threshold admits into a genome-level verdict, which cost
+      12.5% false positives on shreddings of finished genomes; see
+      `docs/benchmark-fragmentation.md`.
     """
     duplicated_marker_contigs = duplicated_marker_contigs or {}
 
@@ -433,12 +451,16 @@ def detect_contamination(
         if observed_total and total_bp:
             marker_rate = observed_total / total_bp
     group_carries_markers: dict[int, bool] = {}
+    group_markers: dict[int, tuple[int, float]] = {}
     for root, members in groups.items():
-        observed = sum(contig_marker_counts.get(scored[i].name, 0) for i in members)             if contig_marker_counts else 0
+        observed = sum(contig_marker_counts.get(scored[i].name, 0) for i in members) \
+            if contig_marker_counts else 0
         if marker_rate is None:
             group_carries_markers[root] = False
+            group_markers[root] = (observed, 0.0)
             continue
         expected = marker_rate * sum(scored[i].length for i in members)
+        group_markers[root] = (observed, expected)
         group_carries_markers[root] = observed >= max(1.0, 0.5 * expected)
 
     verdicts: list[ContigVerdict] = []
@@ -465,18 +487,36 @@ def detect_contamination(
             call = "core"
         elif group_dup >= marker_dup_threshold:
             call = "contaminant_candidate"
-        elif group_carries_markers.get(root, False):
-            # Carries core single-copy markers at something like the genome-wide
-            # rate, so it is chromosomal sequence -- and chromosomal sequence with
-            # foreign composition is a second organism, not a plasmid. Plasmids
-            # and chromids do not carry the universal single-copy core.
-            call = "contaminant_candidate"
-            flags.append("carries_core_markers")
         elif marker_rate is None:
             # No marker scan was supplied, so "carries no core markers" is not a
             # fact about this group, merely an absence of evidence. Report the
             # anomaly rather than explaining it away as a plasmid.
             call = "contaminant_candidate"
+        elif group_carries_markers.get(root, False):
+            # Carries the single-copy core at roughly the genome-wide rate, and
+            # not one of those markers is duplicated anywhere else in the
+            # assembly -- so these are this organism's *only* copies of them. A
+            # group holding the sole copy of part of the core is this organism's
+            # own chromosome, however foreign its composition looks. A second
+            # organism brings its own copies of a universal single-copy set and
+            # they duplicate the host's; that is the branch above, and it is the
+            # branch that has ground truth behind it.
+            #
+            # Calling this contamination instead cost specificity outright. The
+            # FWER threshold admits a compositional outlier on some share of
+            # perfectly clean assemblies by construction, and this arm turned
+            # every one of them into a genome-level verdict. Measured over 320
+            # shreddings of eight finished genomes: 40 false positives, 12.5%,
+            # rising from 1.6% at 10 pieces to 26.6% at 1000. Zero afterwards,
+            # with the outliers still flagged and still reported.
+            # It also discarded the biology: a prophage or a genomic island is
+            # precisely a chromosomal region with atypical composition, and the
+            # comparative step drops genes sitting on suspect contigs.
+            n_obs, n_exp = group_markers.get(root, (0, 0.0))
+            call = "atypical_host_region"
+            flags.append(
+                f"sole_copy_core_markers(n={n_obs}, expected={n_exp:.1f}, displaced=0)"
+            )
         elif group_mass >= replicon_min_length:
             # A compositionally coherent group of this mass, carrying no displaced
             # core markers, is as likely a plasmid or chromid as a foreign
@@ -514,6 +554,7 @@ def detect_contamination(
 
     suspect = [v for v in verdicts if v.call == "contaminant_candidate"]
     replicons = [v for v in verdicts if v.call == "replicon_candidate"]
+    host_regions = [v for v in verdicts if v.call == "atypical_host_region"]
     suspect_bp = sum(v.length for v in suspect)
     suspect_fraction = suspect_bp / total_bp if total_bp else 0.0
 
@@ -533,6 +574,14 @@ def detect_contamination(
             f"{len(replicons)} large contig(s) ({round(100 * sum(v.length for v in replicons) / total_bp, 2)}% "
             "of assembly) have distinct composition but carry no displaced core markers -- "
             "consistent with a plasmid or a second chromosome, not resolvable by composition alone"
+        )
+    if host_regions:
+        reasons.append(
+            f"{len(host_regions)} contig(s) "
+            f"({round(100 * sum(v.length for v in host_regions) / total_bp, 2)}% of assembly) "
+            "have distinct composition but hold this assembly's only copies of core "
+            "single-copy markers -- this organism's own chromosome, so a prophage or "
+            "acquired island rather than contamination"
         )
     if cross_contig_dups:
         share = (
@@ -606,6 +655,7 @@ def detect_contamination(
             "gc_absolute_threshold": gc_absolute_threshold,
             "marker_dup_threshold": marker_dup_threshold,
             "replicon_candidates": [v.name for v in replicons],
+            "atypical_host_regions": [v.name for v in host_regions],
             "contigs_scored": len(scored),
             "contigs_skipped_short": len(asm.contigs) - len(scored),
             "duplicated_markers_total": n_dup_markers,

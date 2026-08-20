@@ -76,12 +76,24 @@ gene calls and marker tables.
 | `core` | composition matches the rest of the assembly |
 | `contaminant_candidate` | compositionally foreign **and** carrying single-copy markers duplicated elsewhere |
 | `replicon_candidate` | large and compositionally distinct, but no displaced markers — a plasmid or second chromosome is at least as likely as a contaminant |
+| `atypical_host_region` | compositionally distinct, but holding the assembly's *only* copies of core single-copy markers — this organism's own chromosome, so a prophage or acquired island rather than contamination |
+| `marker_conflict` | carries duplicated core markers while its composition looks native |
 
-The `replicon_candidate` class exists because of what real data did to the first
-version of this code: the finished *P. phenoliruptrix* BR3459a genome has a
+Two of those classes exist because of what real data did to earlier versions of
+this code.
+
+`replicon_candidate`: the finished *P. phenoliruptrix* BR3459a genome has a
 785 kb replicon at 59.1% GC against a 63.5% GC chromosome, and the detector
 called it contamination. It is a megaplasmid. Composition cannot tell those
 apart, so the pipeline now says so instead of guessing.
+
+`atypical_host_region`: a compositional outlier that carries core markers used to
+be read as a second organism, on the reasoning that plasmids do not carry the
+universal core. But a second organism arrives with its *own* copies of those
+genes, which duplicate the host's — and if a group holds the assembly's only
+copies, it is the host. Reading it the other way turned the detector's own
+family-wise error rate into contamination verdicts on clean genomes, measured in
+[`docs/benchmark-fragmentation.md`](docs/benchmark-fragmentation.md).
 
 Strain-unique genes are labelled `contamination-suspect contig`,
 `clustered in genomic island (acquisition/HGT candidate)`,

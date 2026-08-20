@@ -49,18 +49,18 @@ GenomeX returns a category with evidence, CheckM2 a percentage, so the honest co
 
 | GenomeX verdict | genomes | CheckM2 contamination: median | min | max |
 |---|---|---|---|---|
-| clean | 61 | 0.93% | 0.00% | 9.35% |
-| possible | 2 | 2.10% | 0.04% | 2.10% |
-| likely | 9 | 1.99% | 0.01% | 7.67% |
+| clean | 63 | 1.02% | 0.00% | 9.35% |
+| possible | 1 | 0.04% | 0.04% | 0.04% |
+| likely | 8 | 1.99% | 0.01% | 7.67% |
 
 ### Against a CheckM2 threshold of 5.0%
 
 | | CheckM2 contaminated | CheckM2 clean |
 |---|---|---|
-| **GenomeX flagged** | 1 | 10 |
-| **GenomeX quiet** | 3 | 58 |
+| **GenomeX flagged** | 1 | 8 |
+| **GenomeX quiet** | 3 | 60 |
 
-Recall 0.25 (1/4 caught), precision 0.09 (1/11 flags justified at this threshold).
+Recall 0.25 (1/4 caught), precision 0.11 (1/9 flags justified at this threshold).
 
 Missed by GenomeX:
 
@@ -74,10 +74,10 @@ Missed by GenomeX:
 
 | | CheckM2 contaminated | CheckM2 clean |
 |---|---|---|
-| **GenomeX flagged** | 0 | 11 |
-| **GenomeX quiet** | 0 | 61 |
+| **GenomeX flagged** | 0 | 9 |
+| **GenomeX quiet** | 0 | 63 |
 
-Recall undefined -- no genome exceeds this threshold, precision 0.00 (0/11 flags justified at this threshold).
+Recall undefined -- no genome exceeds this threshold, precision 0.00 (0/9 flags justified at this threshold).
 
 
 <!-- hand-written below; preserved when this page is regenerated -->
@@ -107,13 +107,21 @@ genome-level detection went from 0/4 pairs to 4/4 at 2% donor, and 3/4 to 4/4 at
 
 | | `bacteria_odb10` (124) | `burkholderiales_odb10` (688) |
 |---|---|---|
-| genomes flagged of 72 | 13 | 11 |
-| recall at CheckM2 >= 5% | 0.25 (1/4) | 0.25 (1/4) |
-| precision at CheckM2 >= 5% | 0.08 | 0.09 |
+| genomes flagged of 72 | 9 | 9 |
+| recall at CheckM2 >= 5% | 0.00 (0/4) | 0.25 (1/4) |
+| precision at CheckM2 >= 5% | 0.00 | 0.11 |
 | corr(cross-contig duplication %, CheckM2 %) | -0.026 | 0.161 |
 | completeness mean abs difference | 0.55 pt | 0.63 pt |
 
 The same three genomes are missed, and they are missed for the same reason.
+
+Those flag counts and the 124-marker recall are lower than the figures this page
+carried at v0.2.0 (13 and 11 flagged, recall 0.25 under both sets). The
+sole-copy rule described in `benchmark-fragmentation.md` removed a contamination
+arm that fired on 12.5% of shreddings of finished genomes, and it took
+`GCF_009362735.1` with it at 124 markers. At 688 that genome is still called
+`likely`, which is the one place in this comparison where the deeper set now buys
+something the shallow one does not.
 
 ## The two tools are not measuring the same thing
 

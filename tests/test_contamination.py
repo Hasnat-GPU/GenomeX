@@ -171,21 +171,67 @@ def test_without_a_marker_scan_no_plasmid_claim_is_made(tmp_path):
 
 
 def test_foreign_sequence_carrying_core_markers_is_a_second_organism(tmp_path):
-    """A compositionally distinct group that carries the single-copy core at the
-    genome-wide rate is chromosomal sequence from another organism, and mass must
-    not buy it a plasmid reading however large it is."""
+    """A compositionally distinct group carrying *duplicate* copies of the core is
+    chromosomal sequence from another organism, and mass must not buy it a plasmid
+    reading however large it is.
+
+    Duplication is the load-bearing word. A second organism arrives with its own
+    copy of a universal single-copy gene, so the assembly ends up holding two --
+    one on host sequence, one on foreign. That is what is planted here."""
     genome = contaminated_genome(
         name="organism", n_host=12, n_foreign=3, contig_len=60_000,
         host_gc=0.63, foreign_gc=0.52, seed=13,
     )
     asm = _load(tmp_path, genome)
     marker_counts = {c.name: 10 for c in asm.contigs}  # core spread everywhere
+    host = sorted(c.name for c in asm.contigs if c.name not in genome.foreign_contigs)
+    # Each foreign contig holds a second copy of markers the host already has.
+    duplicated = {
+        f"BUSCO{k}": [host[k % len(host)], foreign]
+        for foreign in sorted(genome.foreign_contigs)
+        for k in range(4)
+    }
 
-    result = detect_contamination(asm, contig_marker_counts=marker_counts)
+    result = detect_contamination(
+        asm, contig_marker_counts=marker_counts, duplicated_marker_contigs=duplicated,
+    )
     calls = {c.name: c.call for c in result.contigs}
     for planted in genome.foreign_contigs:
         assert calls[planted] == "contaminant_candidate", planted
     assert genome.foreign_contigs <= result.suspect_contig_names()
+
+
+def test_sole_copies_of_the_core_make_a_region_the_host_not_a_contaminant(tmp_path):
+    """The same geometry with the duplication removed must not be contamination.
+
+    A group whose core markers are the assembly's *only* copies cannot be a second
+    organism: a second organism brings its own copies of a universal single-copy
+    set, and they show up as duplicates. Sole copies mean this is the one genome
+    present, and the odd composition is a prophage, an island, or the tail of the
+    null -- so it is reported, and excluded from the contamination fraction.
+
+    Calling it contamination is what let the family-wise error rate leak straight
+    into the genome verdict: `docs/benchmark-fragmentation.md` measures the cost."""
+    genome = contaminated_genome(
+        name="island", n_host=12, n_foreign=3, contig_len=60_000,
+        host_gc=0.63, foreign_gc=0.52, seed=13,
+    )
+    asm = _load(tmp_path, genome)
+    marker_counts = {c.name: 10 for c in asm.contigs}
+
+    result = detect_contamination(asm, contig_marker_counts=marker_counts)
+    calls = {c.name: c.call for c in result.contigs}
+    for planted in genome.foreign_contigs:
+        assert calls[planted] == "atypical_host_region", planted
+    assert result.suspect_contig_names() == set()
+    assert result.n_suspect_contigs == 0
+    # Still reported, with the count that justifies the call.
+    assert genome.foreign_contigs <= result.flagged_contig_names()
+    assert {r["contig"] for r in result.summary()["atypical_host_regions"]} == (
+        genome.foreign_contigs
+    )
+    flags = {c.name: c.flags for c in result.contigs}
+    assert any("sole_copy_core_markers" in f for f in flags[sorted(genome.foreign_contigs)[0]])
 
 
 def test_too_few_contigs_returns_undetermined_not_a_guess(tmp_path):

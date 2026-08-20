@@ -6,7 +6,54 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **A compositional outlier that carries core markers is no longer contamination
+  unless those markers are duplicated elsewhere.** New contig call
+  `atypical_host_region`: compositionally distinct, but holding the assembly's
+  only copies of part of the single-copy core. A second organism arrives with its
+  own copies of a set defined to occur once per genome and they duplicate the
+  host's; sole copies mean the sequence is native, so it is reported as a prophage
+  or island candidate and excluded from the contamination fraction.
+
+  This is a change of inference, not of threshold. No cutoff moved.
+
+  Measured on `bench/fragmentation_ladder.py`, now with `--seeds`: 320 shreddings
+  of eight finished genomes went from **40 false verdicts (12.5%, rising from
+  1.6% at 10 pieces to 26.6% at 1000) to 0**. Outliers are still found — 292 of
+  the 320 draws still flag a group — so nothing was silenced. Both mixture
+  ladders came back bit-for-bit identical under both marker sets, and no donor
+  contig in 48 constructed rows was excused as a host region.
+
+  On the 72-genome CheckM2 comparison, run once at the end: flags fell from 13 to
+  9, and **recall at CheckM2 ≥ 5% fell from 0.25 to 0.00 under the default
+  124-marker set** — the single genome it used to catch, `GCF_009362735.1`, was
+  caught by exactly this arm and carries zero of 124 cross-contig duplicated
+  markers. At 688 markers it is still called `likely` and recall is unchanged.
+  Both readings of that genome are set out in
+  `docs/benchmark-contamination.md`; the repository does not claim to settle it.
+
+  `docs/benchmark-fragmentation.md`, `docs/decisions.md` #14.
+
+### Added
+
+- `bench/fragmentation_ladder.py --seeds N` — independent shreddings per rung.
+  One draw per rung is not a rate, and the previous "13/15 rungs clean" was one
+  draw: at eight seeds the same detector was still wrong on 40 of 320.
+- `docs/benchmark-fragmentation.md` — the specificity evidence, previously
+  scattered across `bench/README.md` and a row of the CheckM2 page.
+- `tests/test_bench_fragmentation.py` — the harness is a measuring instrument and
+  is now tested like one: seeds must give distinct shreddings, spans must tile
+  each parent without gap or overlap, and every marker must land on exactly one
+  fragment.
+
+### Fixed
+
+- `docs/example-report.html` was still the v0.1.1 rendering and showed
+  `GCA_040948545.1` as "likely contaminated" — a verdict neither v0.2.0 nor the
+  current code produces. Regenerated from `demo.sh`. The demo's contamination
+  output is otherwise unchanged by the sole-copy rule, verdict and per-contig
+  call alike.
 
 ## [0.2.0] - 2026-08-20
 

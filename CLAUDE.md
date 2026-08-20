@@ -57,10 +57,10 @@ Read this before repeating any number to a user.
 | Completeness vs CheckM2 residual | explained: tracks fragmented count at r = −0.996 |
 | ANI, orthogroups, core/accessory | unvalidated against a reference, but thin wrappers over fastANI/MMseqs2 |
 | Genomic island calls | guarded by a permutation null; only trust when `informative` is true |
-| Contamination verdict | **rebuilt after refutation** — 13/72 flagged (was 62), verdict levels track CheckM2 monotonically. Locates distinct sequence; is not a contamination percentage |
-| Contamination recall | **measured on constructed mixtures** — 4/4 pairs at 2% and 5% donor with a lineage-specific set (0/4 at 2% with `bacteria_odb10`), controls clean. Agreement with CheckM2 unchanged at 0.25; see `docs/benchmark-contamination-burkholderiales.md` |
+| Contamination verdict | **rebuilt after refutation, then narrowed** — 9/72 flagged (62 → 13 → 9). Locates distinct sequence; is not a contamination percentage |
+| Contamination recall | **measured on constructed mixtures** — 4/4 pairs at 2% and 5% donor with a lineage-specific set (0/4 at 2% with `bacteria_odb10`), controls clean, unchanged by the sole-copy rule. **Against CheckM2 ≥5% it is now 0.00 (0/4) at 124 markers**, 0.25 (1/4) at 688 — the one catch came from the arm the fragmentation ladder refuted |
 | Contamination localisation | **fails for close relatives** — donor a genus away at 4-pt GC offset: recall 0.91–1.00. Same-genus donor at 0.3 pt: never localised, even at 20%. Empty suspect list ≠ nothing foreign |
-| Fragmentation invariance | 13/15 ladder rungs clean (was 2/15); corr(score, log length) −0.09 (was −0.43) |
+| Fragmentation invariance | **0/320 shreddings of finished genomes produce a false verdict** (v0.2.0: 40/320, 12.5%, rising to 26.6% at 1000 pieces — the old "13/15 rungs" was one draw); corr(score, log length) −0.09 |
 | replicon vs contaminant split | rests on core-marker rate; genuinely ambiguous without coverage depth |
 
 ## Environment gotchas that have cost real time
@@ -84,7 +84,8 @@ Read this before repeating any number to a user.
   **Read it first when resuming work.** Untracked.
 - `docs/decisions.md` — why the design is what it is, and what was rejected.
 - `docs/benchmark-busco.md`, `docs/benchmark-contamination.md`,
-  `docs/benchmark-mixture.md` — the evidence. The mixture page is the only one
-  measuring recall against truth this repo constructs rather than borrows.
+  `docs/benchmark-mixture.md`, `docs/benchmark-fragmentation.md` — the evidence.
+  The last two are the only ones measured against truth this repo constructs
+  rather than borrows: mixture for recall, fragmentation for specificity.
 - `.claude/skills/genomex/SKILL.md` — how to run and interpret the pipeline,
   including when to refuse to answer.

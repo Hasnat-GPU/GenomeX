@@ -97,15 +97,27 @@ makes and you must preserve when reporting:
   markers. In multipartite genomes (Paraburkholderia, Cupriavidus, Vibrio) this is
   usually a plasmid or a second chromosome. Composition cannot separate a
   megaplasmid from a contaminant; say so rather than picking one.
+- `atypical_host_region` — compositionally distinct, but holding the assembly's
+  *only* copies of core single-copy markers. A second organism brings its own
+  copies and they duplicate the host's; sole copies mean this is the host's own
+  chromosome. Report it as a prophage or acquisition candidate, never as
+  contamination, and never exclude its genes from a comparative count.
 - `undetermined` — too little sequence to build a within-genome null. Report
   per-contig composition instead of a verdict.
 
 **The verdict is not a contamination percentage and must never be reported as
 one.** It locates compositionally distinct sequence. Against CheckM2 over 72
-published assemblies it flags 13 with verdict levels that track CheckM2's
-percentage monotonically, but it calls three genomes clean that CheckM2 puts
-above 5%. If a user needs a MIMAG-style percentage, tell them to run CheckM2 or
-CheckM — do not substitute this.
+published assemblies it flags 9, and with the default `bacteria_odb10` it calls
+**all four** genomes clean that CheckM2 puts above 5% — recall 0.00 at that
+threshold, 0.25 with a lineage-specific set. If a user needs a MIMAG-style
+percentage, tell them to run CheckM2 or CheckM — do not substitute this, and do
+not present a `clean` verdict as evidence that a genome is uncontaminated. It
+means these two channels found no reason to say otherwise.
+
+**A `clean` verdict beside a long list of `replicon_candidate` or
+`atypical_host_region` contigs is not a quiet genome.** Those rows are the
+detector reporting distinct sequence it declined to call foreign, and the reasons
+say which reading it took. Read them out; do not compress them to the verdict.
 
 **An empty `suspect_contigs` beside a non-clean verdict does not mean nothing is
 foreign.** It means the evidence was marker duplication, which proves a second
@@ -124,17 +136,20 @@ knows the lineage, suggest `--lineage`; **never infer it for them** — a marker
 set chosen wrongly reports fake incompleteness, and guessing violates the
 abstention rule below.
 
-The three genomes CheckM2 puts above 5% duplicate 0.15–0.58% of the core under
-either set, at or below the ~1% finished genomes show from ordinary paralogy. Do
-not describe them as "missed": the honest statement is that the two tools
-disagree about what those assemblies contain, that GenomeX finds distinct
-sequence in all three (7–18 replicon groups) carrying none of the core, and that
-separating mobile material from a low-abundance contaminant needs coverage depth
-this pipeline has no input for.
+Of the four genomes CheckM2 puts above 5%, three duplicate 0.15–0.58% of the core
+under either set, at or below the ~1% finished genomes show from ordinary
+paralogy. The fourth, `GCF_009362735.1` at CheckM2 7.67%, duplicates **0 of 124**
+and 1.60% of 688. Do not describe them as "missed": the honest statement is that
+the two tools disagree about what those assemblies contain, that GenomeX finds
+distinct sequence in all four and reports it, and that separating mobile material
+from a low-abundance contaminant needs coverage depth this pipeline has no input
+for. Say which tool you are quoting and why.
 
 Scoring is conditioned on contig length, so the verdict no longer moves when an
-assembly is more fragmented; `params.fwer_z_threshold` records the cutoff and
-`params.null_curve` the calibration it came from.
+assembly is more fragmented: `params.fwer_z_threshold` records the cutoff,
+`params.null_curve` the calibration it came from, and 320 shreddings of eight
+finished genomes now produce zero false verdicts (v0.2.0: 40, rising to 26.6% at
+1000 pieces). See `docs/benchmark-fragmentation.md`.
 
 **ANI**. ≥95% is the operational species boundary. `null` means fastANI found too
 little to align (below roughly 80% identity) — that means *distant*, not

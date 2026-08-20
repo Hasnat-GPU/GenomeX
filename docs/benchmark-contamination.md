@@ -49,24 +49,25 @@ GenomeX returns a category with evidence, CheckM2 a percentage, so the honest co
 
 | GenomeX verdict | genomes | CheckM2 contamination: median | min | max |
 |---|---|---|---|---|
-| clean | 59 | 0.93% | 0.00% | 9.35% |
-| possible | 9 | 1.23% | 0.22% | 4.35% |
-| likely | 4 | 2.13% | 0.01% | 7.67% |
+| clean | 63 | 1.02% | 0.00% | 9.35% |
+| possible | 8 | 1.23% | 0.22% | 4.35% |
+| likely | 1 | 1.99% | 1.99% | 1.99% |
 
 ### Against a CheckM2 threshold of 5.0%
 
 | | CheckM2 contaminated | CheckM2 clean |
 |---|---|---|
-| **GenomeX flagged** | 1 | 12 |
-| **GenomeX quiet** | 3 | 56 |
+| **GenomeX flagged** | 0 | 9 |
+| **GenomeX quiet** | 4 | 59 |
 
-Recall 0.25 (1/4 caught), precision 0.08 (1/13 flags justified at this threshold).
+Recall 0.00 (0/4 caught), precision 0.00 (0/9 flags justified at this threshold).
 
 Missed by GenomeX:
 
 | genome | CheckM2 contamination |
 |---|---|
 | GCA_000519245.1 | 9.35% |
+| GCF_009362735.1 | 7.67% |
 | GCA_038900585.1 | 5.66% |
 | GCA_001725945.1 | 5.17% |
 
@@ -74,10 +75,10 @@ Missed by GenomeX:
 
 | | CheckM2 contaminated | CheckM2 clean |
 |---|---|---|
-| **GenomeX flagged** | 0 | 13 |
-| **GenomeX quiet** | 0 | 59 |
+| **GenomeX flagged** | 0 | 9 |
+| **GenomeX quiet** | 0 | 63 |
 
-Recall undefined -- no genome exceeds this threshold, precision 0.00 (0/13 flags justified at this threshold).
+Recall undefined -- no genome exceeds this threshold, precision 0.00 (0/9 flags justified at this threshold).
 
 
 <!-- hand-written below; preserved when this page is regenerated -->
@@ -106,6 +107,7 @@ threshold was ever fitted to the numbers on this page.
 | recall at CheckM2 >= 5% | 1.00 (4/4) | 0.25 (1/4) |
 | precision at CheckM2 >= 5% | 0.06 | 0.08 |
 | ladder rungs called clean | 2/15 | 13/15 |
+| ^ but that is one shredding per rung | — | at 8 seeds x 8 genomes: 40/320 draws still false |
 | corr(contig score, log length) | -0.28 to -0.43 | -0.09 |
 
 Two of those rows must be read together. The verdict now carries ordering
@@ -113,6 +115,55 @@ information it did not have before -- median CheckM2 contamination rises
 monotonically across the three levels -- and the false-positive rate fell by a
 factor of five. It cost recall: three genomes CheckM2 puts above 5% are now
 called clean. Reporting the first without the second would be dishonest.
+
+## The second correction, and what it cost here
+
+The `13/15` above was one shredding per rung. Repeating the ladder with eight
+seeds across the eight finished genomes in this collection -- 320 draws instead
+of 15 -- showed the rebuilt detector still returning a false verdict on 12.5% of
+them, climbing from 1.6% at 10 pieces to 26.6% at 1000. Every one of those 40
+draws went through the same inference: a compositionally distinct group that
+carries core single-copy markers must be a second organism.
+
+It must not. A second organism carries its *own* copies of a set defined to occur
+once per genome, and those duplicate the host's. A group holding the assembly's
+only copies is the host. That group is now called `atypical_host_region`, is
+reported in full, and is excluded from the contamination fraction. The ladder
+goes to 0/320 with 292 of the 320 draws still flagging outlier groups, so nothing
+was silenced. `benchmark-fragmentation.md` has the measurement and the mechanism;
+`decisions.md` #14 has the argument.
+
+Re-measuring this page afterwards -- once, at the end, as the rules require:
+
+| | v0.2.0 | after the sole-copy rule |
+|---|---|---|
+| genomes flagged of 72 | 13 | 9 |
+| flagged with CheckM2 < 5% | 12 | 9 |
+| recall at CheckM2 >= 5% | 0.25 (1/4) | **0.00 (0/4)** |
+| precision at CheckM2 >= 5% | 0.08 | 0.00 |
+| ladder false positives | 40/320 | 0/320 |
+
+**The one genome above 5% that GenomeX used to catch is now called clean, and
+that is the whole recall.** `GCF_009362735.1`, CheckM2 7.67%: six contigs holding
+10.68% of the assembly, compositionally distinct, carrying the assembly's only
+copies of core markers. Its `likely` came entirely from the arm that has now been
+removed, and it carried **zero of 124 cross-contig duplicated markers** -- the
+channel with constructed ground truth behind it says there is no second organism
+there at all. At 688 markers the same genome is still called `likely` and recall
+on this page is unchanged at 0.25, so the loss is specific to the shallow default
+set.
+
+Two readings are available and this repository will not choose between them
+without a third source. Either the arm was right about this genome for a reason
+its own benchmark cannot see, or it was a 1-in-13 hit from a rule measured at a
+12.5% false-positive rate on genomes constructed to be clean. What is not in
+doubt is the trade: twelve false flags accompanied that one catch, and both are
+gone together.
+
+What did *not* change is what a reader sees. The distinct sequence in
+`GCF_009362735.1` is still located, still listed with its z-scores, still 18.8%
+of the assembly across 15 replicon groups and 6 host regions. The verdict moved;
+the evidence did not.
 
 ## Why the two tools disagree at 5%
 
@@ -151,6 +202,9 @@ with fragmentation-invariant behaviour and a stated error rate. Read
 `contigs.tsv`, the `replicon_candidate` groups, and the reasons.
 
 Do not read the verdict as a MIMAG-style contamination percentage, and do not
-substitute it for CheckM2 or CheckM if that number is what you need. A genome
-called `clean` here can carry several percent of foreign sequence that neither
-duplicates core markers nor forms a compositionally coherent block.
+substitute it for CheckM2 or CheckM if that number is what you need. Against this
+collection and the default 124-marker set, the verdict's recall on the four
+genomes CheckM2 puts above 5% is **zero**. A genome called `clean` here can carry
+several percent of foreign sequence that neither duplicates core markers nor
+forms a compositionally coherent block, and the `clean` says only that this
+tool's two channels found no reason to say otherwise.

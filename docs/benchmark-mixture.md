@@ -119,6 +119,24 @@ genomes, not the GC summary, is what decides it.
   strict improvement here, but the caller must name it — guessing the lineage
   would violate the abstention rule the rest of the tool holds to.
 
+## Unchanged by the sole-copy rule
+
+Both ladders were re-run when `atypical_host_region` was introduced (see
+[`benchmark-fragmentation.md`](benchmark-fragmentation.md)), because that change
+could plausibly have excused donor contigs as the host's own atypical chromosome
+and inflated recall's denominator quietly.
+
+It did not. Every figure in both files is bit-for-bit what it was: same verdicts,
+same contig and bp recall, same precision, same host false positives, same
+duplicated-marker counts, across all 48 rows and both marker sets. The
+`donor_as_host_region` column added for exactly this check reads **0 everywhere**.
+
+That is what the rule predicts. Donor fragments are cut from a real genome, so
+their core markers duplicate the host's copies and they meet the duplication
+branch before the sole-copy branch is reached. The case the rule could cost — a
+contaminant contributing core markers that duplicate nothing, because the host is
+missing its own copy — does not occur in these mixtures and is not measured here.
+
 ## Reproducing
 
 ```bash
