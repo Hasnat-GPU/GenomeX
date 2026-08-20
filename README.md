@@ -166,7 +166,13 @@ The contamination tests plant a known answer and check it is recovered:
   reimplementation: it does not re-predict genes per candidate region, so a
   genome outside the tested set may still diverge.
 - Contamination detection is composition-based: blind to a close relative of the
-  host, and unable to name a contaminant without a reference database.
+  host, and unable to name a contaminant without a reference database. Measured:
+  a donor genus away at a 4-point GC offset is located contig by contig at recall
+  0.91–1.00; a same-genus donor at 0.3 points is detected at genome level but
+  never localised, even at 20% of the assembly.
+- The marker set is a choice the caller makes (`--lineage`), and it changes what
+  contamination levels are expressible: 124 markers quantise at 0.81%, 688 at
+  0.15%. GenomeX will not guess a lineage.
 - Contigs below `--min-contig-length` are not scored.
 - No functional annotation. "Unique" means no sequence-cluster partner, not novel
   and not characterised.
@@ -188,13 +194,32 @@ estimate a contamination percentage.** It was rebuilt after the first CheckM2
 comparison showed it flagging 62 of 72 published assemblies. Scoring is now
 conditioned on contig length against a null built from the assembly's own
 sequence, and it flags 13 of 72 with verdict levels that track CheckM2
-monotonically. That cost recall: three genomes CheckM2 puts above 5% are called
-clean, because 124 single-copy markers quantise contamination in steps of 0.81%
-and cannot resolve 5%. Both numbers, and why, are in
-[`docs/benchmark-contamination.md`](docs/benchmark-contamination.md).
+monotonically.
 
-Read `contigs.tsv` and the replicon groups. Do not substitute the verdict for
-CheckM2 or CheckM if you need a MIMAG-style contamination percentage.
+Recall has since been measured against ground truth this repository constructs:
+`bench/mixture_ladder.py` splices fragments of one genome into another at a known
+share of the total. With a lineage-specific marker set, a 2% foreign genome is
+detected in 4/4 pairs and a 5% one in 4/4, with the 0% controls staying clean —
+against 0/4 at 2% under the universal 124-marker set, whose 0.81% quantisation
+cannot express those levels.
+
+Agreement with CheckM2 did not move: recall at its 5% threshold stays 0.25 under
+both marker sets. The three genomes CheckM2 puts above 5% duplicate 0.15–0.58% of
+the single-copy core, at or below the ~1% that finished reference genomes here
+show from ordinary paralogy — so whatever CheckM2 is responding to in them is not
+a second organism contributing its share of the core. GenomeX does find distinct
+sequence in all three, 7 to 18 replicon groups each, which is what mobile or
+laterally acquired material looks like and also what a contaminant carrying no
+core genes looks like. Separating those needs coverage depth, which this pipeline
+has no input for. The full argument, and the numbers on both sides, are in
+[`docs/benchmark-contamination.md`](docs/benchmark-contamination.md),
+[`docs/benchmark-contamination-burkholderiales.md`](docs/benchmark-contamination-burkholderiales.md)
+and [`docs/benchmark-mixture.md`](docs/benchmark-mixture.md).
+
+Read `contigs.tsv` and the replicon groups. An empty suspect list beside a
+non-clean verdict means the evidence was marker duplication, which does not
+localise — it is a lower bound, never "nothing foreign". Do not substitute the
+verdict for CheckM2 or CheckM if you need a MIMAG-style contamination percentage.
 
 The same comparison verified what does work: genome size, contig count, GC, N50,
 CDS count and coding density agree with CheckM2 exactly across all 72 genomes,

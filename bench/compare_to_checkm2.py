@@ -33,6 +33,12 @@ from pathlib import Path
 #: medium-quality allows <10%.
 CONTAMINATION_THRESHOLDS = (5.0, 10.0)
 
+#: Everything from this marker to the end of an existing page is hand-written
+#: and survives regeneration. Re-running a measurement must not delete the
+#: interpretation attached to it -- that is how a page ends up with fresh
+#: numbers and no record of what they meant, or of the caveats a reader needs.
+COMMENTARY_MARKER = "<!-- hand-written below; preserved when this page is regenerated -->"
+
 #: Deterministic quantities and the relative tolerance each must agree within.
 STAT_TOLERANCE = {
     "genome_size": 0.0,       # identical bases in, identical total out
@@ -53,6 +59,15 @@ def load_checkm2(path: Path) -> dict[str, dict]:
                 continue
             out[name] = row
     return out
+
+
+def existing_commentary(path: Path) -> str:
+    """The hand-written tail of a previously generated page, marker included."""
+    if not path.exists():
+        return ""
+    text = path.read_text(encoding="utf-8")
+    idx = text.find(COMMENTARY_MARKER)
+    return text[idx:].strip() if idx >= 0 else ""
 
 
 def load_genomex(run_dir: Path) -> dict[str, dict]:
@@ -265,12 +280,18 @@ def main(argv: list[str] | None = None) -> int:
         lines.append(f"| **GenomeX flagged** | {tp} | {fp} |")
         lines.append(f"| **GenomeX quiet** | {fn} | {tn} |")
         lines.append("")
-        recall = tp / (tp + fn) if (tp + fn) else float("nan")
-        prec = tp / (tp + fp) if (tp + fp) else float("nan")
-        lines.append(
-            f"Recall {recall:.2f} ({tp}/{tp + fn} caught), precision {prec:.2f} "
-            f"({tp}/{tp + fp} flags justified at this threshold)."
-        )
+        # "Recall nan (0/0 caught)" is not a result, it is a division by zero
+        # wearing a number's clothes. Say that the threshold has no positives.
+        if tp + fn:
+            recall = f"recall {tp / (tp + fn):.2f} ({tp}/{tp + fn} caught)"
+        else:
+            recall = "recall undefined -- no genome exceeds this threshold"
+        if tp + fp:
+            prec = (f"precision {tp / (tp + fp):.2f} "
+                    f"({tp}/{tp + fp} flags justified at this threshold)")
+        else:
+            prec = "precision undefined -- GenomeX flagged nothing"
+        lines.append(f"{recall.capitalize()}, {prec}.")
         if missed:
             lines.append("")
             lines.append("Missed by GenomeX:")
@@ -281,9 +302,15 @@ def main(argv: list[str] | None = None) -> int:
                 lines.append(f"| {g} | {c:.2f}% |")
         lines.append("")
 
+    kept = existing_commentary(args.out)
+    if kept:
+        lines.extend(["", kept])
+
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+    if kept:
+        print(f"  kept {len(kept.splitlines())} lines of hand-written commentary")
     print(f"genomes compared: {len(shared)}")
     for stat in STAT_TOLERANCE:
         n = len(stat_failures[stat])

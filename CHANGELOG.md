@@ -6,6 +6,48 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`bench/mixture_ladder.py` — constructed ground truth for contamination
+  recall.** Splices fragments of one genome into another at a known share of the
+  total, so recall and precision are exact rather than borrowed. Donor fragments
+  match host fragments in length (otherwise length is a shortcut the
+  length-conditioned null could exploit) and carry their share of the single-copy
+  core (otherwise it tests a detector nobody runs).
+
+  Measured, four host/donor pairs, by donor share of the assembly: 2% detected in
+  0/4 pairs with `bacteria_odb10` and 4/4 with `burkholderiales_odb10`; 5% in 3/4
+  and 4/4; 0% controls clean in all pairs under both.
+
+  Localisation is unchanged and is the standing limit: a donor a genus away at a
+  4-point GC offset is named contig by contig at recall 0.91–1.00, while a
+  same-genus donor at 0.3 points is never localised, even at 20% of the assembly.
+  Evidence in `docs/benchmark-mixture.md`.
+- `docs/benchmark-contamination-burkholderiales.md` — the 72-genome CheckM2
+  comparison repeated against a 688-marker lineage-specific set. Agreement does
+  not improve: recall at 5% stays 0.25 under both. The three genomes CheckM2 puts
+  above 5% duplicate 0.15–0.58% of the core, at or below the ~1% finished
+  reference genomes show from ordinary paralogy.
+- The CheckM2 page names the marker set it was scanned against, and hand-written
+  commentary below a marker now survives regeneration — a rerun once deleted 74
+  lines explaining which numbers a reader must not trust.
+
+### Fixed
+
+- **Duplicated-marker thresholds are rates, not counts.** `cross_contig_dups >= 5`
+  meant `likely`, a cutoff written against `bacteria_odb10`'s 124 markers with
+  nothing recording the dependency. Scanning the same finished genome against a
+  688-marker set multiplies every count by 5.5 without adding a base of
+  contamination, and four reference genomes carrying ~1% cross-replicon paralogy
+  were reported `likely` contaminated. The thresholds are the old cutoffs divided
+  by 124, `>=` preserved, so on `bacteria_odb10` the rule is unchanged bit for bit.
+- `GCA_022041995.1` carried the collection's highest duplication at 5.65% against
+  CheckM2's 2.37%. Most of it was paralogy within single contigs, and against the
+  lineage-specific set it falls to 2.18% — an artefact of scoring a
+  Burkholderiaceae genome against a marker set defined across all bacteria.
+- A `nan` recall no longer appears on a generated page when no genome exceeds the
+  threshold being tested.
+
 ### Changed
 
 - **Contamination scoring is now conditioned on contig length.** A

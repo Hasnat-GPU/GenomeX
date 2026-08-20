@@ -57,7 +57,9 @@ Read this before repeating any number to a user.
 | Completeness vs CheckM2 residual | explained: tracks fragmented count at r = −0.996 |
 | ANI, orthogroups, core/accessory | unvalidated against a reference, but thin wrappers over fastANI/MMseqs2 |
 | Genomic island calls | guarded by a permutation null; only trust when `informative` is true |
-| Contamination verdict | **rebuilt after refutation** — 13/72 flagged (was 62), verdict levels track CheckM2 monotonically, but recall at CheckM2 ≥5% is 0.25. Locates distinct sequence; is not a contamination percentage |
+| Contamination verdict | **rebuilt after refutation** — 13/72 flagged (was 62), verdict levels track CheckM2 monotonically. Locates distinct sequence; is not a contamination percentage |
+| Contamination recall | **measured on constructed mixtures** — 4/4 pairs at 2% and 5% donor with a lineage-specific set (0/4 at 2% with `bacteria_odb10`), controls clean. Agreement with CheckM2 unchanged at 0.25; see `docs/benchmark-contamination-burkholderiales.md` |
+| Contamination localisation | **fails for close relatives** — donor a genus away at 4-pt GC offset: recall 0.91–1.00. Same-genus donor at 0.3 pt: never localised, even at 20%. Empty suspect list ≠ nothing foreign |
 | Fragmentation invariance | 13/15 ladder rungs clean (was 2/15); corr(score, log length) −0.09 (was −0.43) |
 | replicon vs contaminant split | rests on core-marker rate; genuinely ambiguous without coverage depth |
 
@@ -81,6 +83,8 @@ Read this before repeating any number to a user.
 - `.claude/state/PROGRESS.md` — what is in flight right now, and what is next.
   **Read it first when resuming work.** Untracked.
 - `docs/decisions.md` — why the design is what it is, and what was rejected.
-- `docs/benchmark-busco.md`, `docs/benchmark-contamination.md` — the evidence.
+- `docs/benchmark-busco.md`, `docs/benchmark-contamination.md`,
+  `docs/benchmark-mixture.md` — the evidence. The mixture page is the only one
+  measuring recall against truth this repo constructs rather than borrows.
 - `.claude/skills/genomex/SKILL.md` — how to run and interpret the pipeline,
   including when to refuse to answer.

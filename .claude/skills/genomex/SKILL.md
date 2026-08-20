@@ -104,9 +104,33 @@ makes and you must preserve when reporting:
 one.** It locates compositionally distinct sequence. Against CheckM2 over 72
 published assemblies it flags 13 with verdict levels that track CheckM2's
 percentage monotonically, but it calls three genomes clean that CheckM2 puts
-above 5%: 124 single-copy markers quantise contamination in steps of 0.81%, so
-5% is below what marker duplication can resolve. If a user needs a MIMAG-style
-percentage, tell them to run CheckM2 or CheckM — do not substitute this.
+above 5%. If a user needs a MIMAG-style percentage, tell them to run CheckM2 or
+CheckM — do not substitute this.
+
+**An empty `suspect_contigs` beside a non-clean verdict does not mean nothing is
+foreign.** It means the evidence was marker duplication, which proves a second
+organism is present without saying which contig carries it. Treat the suspect
+list as a lower bound, always. Measured on `bench/mixture_ladder.py`: a donor a
+genus away at a 4-point GC offset is localised at recall 0.91–1.00, while a
+same-genus donor at a 0.3-point offset is never localised, even at 20% of the
+assembly, where the genome-level verdict is emphatically `likely`.
+
+**Detection depends on the marker set, so state which one was used.** Report
+`markers.lineage` and `markers.markers_total` alongside any contamination
+verdict; the same genome scored against 124 and 688 markers is two different
+measurements. On constructed mixtures a 2% foreign genome is detected in 0/4
+pairs with `bacteria_odb10` and 4/4 with a lineage-specific set. If the user
+knows the lineage, suggest `--lineage`; **never infer it for them** — a marker
+set chosen wrongly reports fake incompleteness, and guessing violates the
+abstention rule below.
+
+The three genomes CheckM2 puts above 5% duplicate 0.15–0.58% of the core under
+either set, at or below the ~1% finished genomes show from ordinary paralogy. Do
+not describe them as "missed": the honest statement is that the two tools
+disagree about what those assemblies contain, that GenomeX finds distinct
+sequence in all three (7–18 replicon groups) carrying none of the core, and that
+separating mobile material from a low-abundance contaminant needs coverage depth
+this pipeline has no input for.
 
 Scoring is conditioned on contig length, so the verdict no longer moves when an
 assembly is more fragmented; `params.fwer_z_threshold` records the cutoff and

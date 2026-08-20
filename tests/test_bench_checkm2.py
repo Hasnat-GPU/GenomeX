@@ -126,3 +126,40 @@ def test_report_builds_when_the_lineage_is_absent(tmp_path):
 
     assert bench.main(["--genomex", str(gx), "--checkm2", str(cm), "--out", str(out)]) == 0
     assert "1 genomes compared." in out.read_text(encoding="utf-8")
+
+
+def test_regenerating_a_page_keeps_its_hand_written_commentary(tmp_path):
+    """Re-running a measurement must not delete the interpretation attached to it.
+
+    Regenerating this page once silently dropped 74 lines explaining what the
+    numbers meant and which of them a reader must not trust. Fresh numbers with
+    the caveats deleted are worse than stale numbers.
+    """
+    gx = _genomex_json(tmp_path, [_gx_entry("g1", "bacteria_odb10", 124)])
+    cm = _report(tmp_path, ["g1\t100.0\t0.5\t0.88\t4152217\t7650000\t63.5\t6771\t3"])
+    out = tmp_path / "page.md"
+
+    assert bench.main(["--genomex", str(gx), "--checkm2", str(cm), "--out", str(out)]) == 0
+    out.write_text(
+        out.read_text(encoding="utf-8")
+        + f"\n{bench.COMMENTARY_MARKER}\n\n## Why this number is not what it looks like\n\n"
+        "Load-bearing caveat.\n",
+        encoding="utf-8",
+    )
+
+    assert bench.main(["--genomex", str(gx), "--checkm2", str(cm), "--out", str(out)]) == 0
+    text = out.read_text(encoding="utf-8")
+    assert "Why this number is not what it looks like" in text
+    assert "Load-bearing caveat." in text
+    assert text.count(bench.COMMENTARY_MARKER) == 1, "commentary duplicated on rerun"
+
+
+def test_a_page_without_the_marker_is_fully_regenerated(tmp_path):
+    """Only text below the marker is protected; the measurement itself is not."""
+    gx = _genomex_json(tmp_path, [_gx_entry("g1", "bacteria_odb10", 124)])
+    cm = _report(tmp_path, ["g1\t100.0\t0.5\t0.88\t4152217\t7650000\t63.5\t6771\t3"])
+    out = tmp_path / "page.md"
+    out.write_text("stale numbers from an older run\n", encoding="utf-8")
+
+    assert bench.main(["--genomex", str(gx), "--checkm2", str(cm), "--out", str(out)]) == 0
+    assert "stale numbers" not in out.read_text(encoding="utf-8")
