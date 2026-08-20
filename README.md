@@ -56,7 +56,8 @@ No sudo, no Docker, no conda base install required.
 ```bash
 python -m genomex run A.fna B.fna --outdir runs/demo --all-pairs
 python -m genomex qc  A.fna       --outdir runs/qc          # per-genome only
-python -m genomex proteins P.faa  --outdir runs/prot --lineage ~/db/fungi_odb10
+python -m genomex proteins P.faa  --outdir runs/prot --lineage fungi_odb10
+python -m genomex lineages                                  # which sets, and what they cost
 ```
 
 `proteins` takes a protein FASTA instead of an assembly. It is the only path
@@ -65,6 +66,12 @@ markers against BUSCO 5.8.3 on `fungi_odb10`. It yields completeness and
 duplication and nothing else: with no contigs there is no contamination
 analysis, no ANI and no gene order, and the report lists each of those as an
 explicit refusal rather than an empty section.
+
+`--lineage` takes either a bare set name, looked up under `$GENOMEX_DB`
+(default `~/genomex-work/db`), or a directory. It is the flag with the largest
+effect on what the other numbers mean, so `genomex lineages` prints what is
+installed alongside what the choice costs -- and stops short of recommending
+one, because that needs to know the organism.
 
 From Windows PowerShell, `.\gx.ps1 run A.fna B.fna --outdir runs/demo` forwards
 into WSL with the environment already set.
@@ -192,7 +199,11 @@ The contamination tests plant a known answer and check it is recovered:
   never localised, even at 20% of the assembly.
 - The marker set is a choice the caller makes (`--lineage`), and it changes what
   contamination levels are expressible: 124 markers quantise at 0.81%, 688 at
-  0.15%. GenomeX will not guess a lineage.
+  0.15%. It also changes what is detectable at all -- at 2% donor a
+  lineage-specific set finds 4 of 4 constructed mixtures and the universal
+  bacterial set 0 of 4. `genomex lineages` lists what is installed and states
+  that cost; the flag takes a bare name. GenomeX will not guess a lineage, and a
+  set from the wrong clade reports core genes missing that the organism never had.
 - Contigs below `--min-contig-length` are not scored.
 - No functional annotation. "Unique" means no sequence-cluster partner, not novel
   and not characterised.

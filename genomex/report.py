@@ -122,6 +122,37 @@ def _not_measured_table(nm: dict) -> str:
     return _table(["not reported", "status", "why"], rows)
 
 
+#: The universal bacterial set, and the one a user who never finds `--lineage`
+#: gets. Named here so the report can say what it costs rather than leaving the
+#: reader to notice the marker count.
+UNIVERSAL_BACTERIAL = "bacteria_odb10"
+
+
+def _lineage_caveat(m: dict) -> str:
+    """Name the marker set, and say what a verdict from it is worth.
+
+    Every number below this line is relative to one marker set, and the same
+    genome scored against 124 and 688 markers is two measurements. Detection is
+    the part that moves most: a smaller set gives a foreign genome fewer
+    single-copy markers to displace.
+    """
+    lineage, n = _esc(m["lineage"]), m["markers_total"]
+    note = (
+        f'Scored against <b>{lineage}</b> ({n} markers). Completeness, duplication '
+        "and the contamination verdict are all relative to this set &mdash; the same "
+        "genome against a different one is a different measurement."
+    )
+    if m["lineage"] == UNIVERSAL_BACTERIAL:
+        note += (
+            " This is the universal bacterial set, so it is also the least sensitive: "
+            "on constructed 2% mixtures a lineage-specific set locates 4 of 4 donor "
+            "pairs and this one 0 of 4. A <b>single organism</b> verdict here is a "
+            "weaker statement than the same verdict at 688 markers. "
+            "<code>genomex lineages</code> lists what else is installed."
+        )
+    return f'<div class="note">{note}</div>'
+
+
 def render_html(data: dict) -> str:
     genomes = data.get("genomes", [])
     proteomes = data.get("proteomes", [])
@@ -148,6 +179,11 @@ def render_html(data: dict) -> str:
     # ---- per genome -------------------------------------------------------
     if genomes:
         parts.append("<h2>Genome quality</h2>")
+        # The marker set is a property of the run, so it belongs above the
+        # cards rather than repeated in each. A contamination verdict without
+        # it is not interpretable: recall is a function of how many
+        # single-copy markers a foreign genome can displace.
+        parts.append(_lineage_caveat(genomes[0]["markers"]))
     for g in genomes:
         a, m, c, q = g["assembly"], g["markers"], g["contamination"], g["quality_call"]
         parts.append('<div class="card">')
@@ -165,7 +201,9 @@ def render_html(data: dict) -> str:
         parts.append(_stat("completeness", f'{m["completeness_percent"]}%'))
         parts.append(_stat("duplicated", f'{m["duplication_percent"]}%'))
         parts.append("</div>")
-        parts.append(f'<div class="note"><code>{_esc(m["busco_style_string"])}</code></div>')
+        parts.append(
+            f'<div class="note"><code>{_esc(m["busco_style_string"])}</code> &middot; scored against <b>{_esc(m["lineage"])}</b></div>'
+        )
         parts.append(_marker_bar(m))
         reasons = "".join(f"<li>{_esc(r)}</li>" for r in c["reasons"])
         # "Contamination evidence" over an abstention's reason list reads as
@@ -233,7 +271,9 @@ def render_html(data: dict) -> str:
         parts.append(_stat("completeness", f'{m["completeness_percent"]}%'))
         parts.append(_stat("duplicated", f'{m["duplication_percent"]}%'))
         parts.append("</div>")
-        parts.append(f'<div class="note"><code>{_esc(m["busco_style_string"])}</code></div>')
+        parts.append(
+            f'<div class="note"><code>{_esc(m["busco_style_string"])}</code> &middot; scored against <b>{_esc(m["lineage"])}</b></div>'
+        )
         parts.append(_marker_bar(m))
         reasons = "".join(f"<li>{_esc(r)}</li>" for r in q["reasons"])
         parts.append(f'<h3>Assessment</h3><ul class="reasons">{reasons}</ul>')

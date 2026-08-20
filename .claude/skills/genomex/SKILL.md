@@ -45,11 +45,15 @@ python -m genomex qc A.fna --outdir runs/NAME
 
 # specific pairs out of a larger set
 python -m genomex run *.fna --outdir runs/NAME --pair A B --pair A C
+
+# which marker sets are installed, and what picking one costs
+python -m genomex lineages
 ```
 
-Useful flags: `--min-contig-length` (default 3000, floor for composition
-analysis), `--min-seq-id` / `--coverage` (MMseqs2 clustering, default 0.5 / 0.8),
-`--threads`, `--genetic-code`.
+Useful flags: `--lineage` (marker set, by name or directory -- see below, it
+matters more than any other), `--min-contig-length` (default 3000, floor for
+composition analysis), `--min-seq-id` / `--coverage` (MMseqs2 clustering,
+default 0.5 / 0.8), `--threads`, `--genetic-code`.
 
 Outputs under `--outdir`: `report.html` (standalone), `genomex.json` (everything),
 `provenance.json` (every tool invocation and version), `genomes/<name>/contigs.tsv`
@@ -142,6 +146,12 @@ pairs with `bacteria_odb10` and 4/4 with a lineage-specific set. If the user
 knows the lineage, suggest `--lineage`; **never infer it for them** — a marker
 set chosen wrongly reports fake incompleteness, and guessing violates the
 abstention rule below.
+
+`genomex lineages` prints the sets installed on the machine with their marker
+counts and what the choice costs; `--lineage` takes a bare name from that list
+(`--lineage burkholderiales_odb10`) as well as a directory. Run it before
+telling a user no other set is available -- and when the default was used, say
+so and say what it means, because the report now does.
 
 Of the four genomes CheckM2 puts above 5%, three duplicate 0.15–0.58% of the core
 under either set, at or below the ~1% finished genomes show from ordinary

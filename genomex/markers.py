@@ -15,6 +15,7 @@ Two outputs matter downstream:
 
 from __future__ import annotations
 
+import os
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -77,6 +78,99 @@ class Lineage:
             for hmm in sorted((self.path / "hmms").glob("*.hmm")):
                 out.write(hmm.read_bytes())
         return combined
+
+
+# ------------------------------------------------------------ finding a set
+#
+# The marker set is the single most consequential flag this tool has, and until
+# now reaching a non-default one meant knowing both that `--lineage` existed and
+# where the directory lived.  Detection is not a property of the genome alone:
+# on constructed 2% mixtures the universal bacterial set finds 0 of 4 pairs and
+# a lineage-specific set finds 4 of 4 (`docs/benchmark-mixture.md`).  A user who
+# never discovers the flag is measuring something weaker than they think.
+#
+# What follows makes the choice *visible*.  It does not make it automatic --
+# nothing here inspects a genome, and a wrongly-chosen set reports fake
+# incompleteness, so the picking stays with whoever knows the organism.
+
+LINEAGE_DB_ENV = "GENOMEX_DB"
+DEFAULT_LINEAGE_DB = Path.home() / "genomex-work" / "db"
+DEFAULT_LINEAGE_NAME = "bacteria_odb10"
+
+
+def lineage_db() -> Path:
+    """Where lineage directories are looked up by bare name."""
+    return Path(os.environ.get(LINEAGE_DB_ENV) or DEFAULT_LINEAGE_DB)
+
+
+@dataclass(frozen=True)
+class LineageInfo:
+    """Enough to list a set without parsing its cutoff tables."""
+    name: str
+    path: Path
+    n_markers: int
+
+
+def _is_lineage_dir(path: Path) -> bool:
+    return (path / "hmms").is_dir()
+
+
+def describe_lineage(path: Path) -> LineageInfo:
+    cfg: dict[str, str] = {}
+    cfg_path = path / "dataset.cfg"
+    if cfg_path.exists():
+        for line in cfg_path.read_text().splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                cfg[k.strip()] = v.strip()
+    n = cfg.get("number_of_BUSCOs")
+    return LineageInfo(
+        name=cfg.get("name", path.name),
+        path=path,
+        # Counting the profiles is the fallback, not the primary: a set whose
+        # dataset.cfg disagrees with its hmms/ directory is a broken download,
+        # and reporting the cfg number makes that visible at scan time.
+        n_markers=int(n) if n and n.isdigit() else len(list((path / "hmms").glob("*.hmm"))),
+    )
+
+
+def available_lineages(db: Path | None = None) -> list[LineageInfo]:
+    """Every lineage set installed under `db`, by marker count then name."""
+    db = db or lineage_db()
+    if not db.is_dir():
+        return []
+    found = [describe_lineage(d) for d in sorted(db.iterdir())
+             if d.is_dir() and _is_lineage_dir(d)]
+    return sorted(found, key=lambda info: (info.n_markers, info.name))
+
+
+def resolve_lineage(spec: str | Path, db: Path | None = None) -> Path:
+    """Accept either a path to a lineage directory or the bare name of one.
+
+    `--lineage fungi_odb10` is the whole point: the flag was reachable before
+    only by typing an absolute path, which is a barrier disguised as a default.
+    A name is still an explicit choice -- this resolves what was asked for and
+    never guesses when nothing matches.
+    """
+    db = db or lineage_db()
+    given = Path(spec)
+    if _is_lineage_dir(given):
+        return given
+    by_name = db / str(spec)
+    if _is_lineage_dir(by_name):
+        return by_name
+
+    installed = available_lineages(db)
+    if installed:
+        listing = "\n".join(f"  {i.name}  ({i.n_markers} markers)" for i in installed)
+        hint = f"installed under {db}:\n{listing}\n\nRun `genomex lineages` for what each one costs."
+    else:
+        hint = (
+            f"no lineage sets found under {db}. Download one from\n"
+            "https://busco-data.ezlab.org/v5/data/lineages/ and unpack it there, "
+            f"or set {LINEAGE_DB_ENV} to where yours live."
+        )
+    raise FileNotFoundError(f"no lineage set at '{spec}' -- {hint}")
 
 
 @dataclass

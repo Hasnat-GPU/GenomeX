@@ -8,6 +8,27 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **`genomex lineages`, and `--lineage` by name.** The marker set is the flag
+  with the largest effect on every number GenomeX reports, and reaching a
+  non-default one meant knowing both that the flag existed and where the
+  directory lived. It now takes a bare name resolved under `$GENOMEX_DB`
+  (default `~/genomex-work/db`) as well as a path — `--lineage fungi_odb10` —
+  and the new subcommand lists what is installed with marker counts.
+
+  The listing states what the choice costs rather than leaving it to be inferred
+  from a marker count: at 2% donor a lineage-specific set locates 4 of 4
+  constructed mixtures and the universal bacterial set 0 of 4; against CheckM2 at
+  ≥5% recall is 0.00 at 124 markers and 0.25 at 688. A run against the default
+  set prints the same thing, because a user who never finds the flag still gets a
+  verdict and it looks exactly like a good one. The HTML report now names the set
+  above the genome cards and says the same there.
+
+  **It lists; it does not choose.** Nothing here inspects a genome, and a name
+  that does not exist is an error rather than a nearest match — `--lineage
+  bacteria` fails instead of resolving to `bacteria_odb10`. A set from the wrong
+  clade reports core genes missing that the organism never had, so the choice
+  stays with whoever knows the organism.
+
 - **`proteins` subcommand: completeness from a protein FASTA.** `scan_markers`
   always accepted a proteome — the assembly path just hands it Prodigal's output
   — but there was no route to it from the CLI. This adds one, which is what makes

@@ -3,7 +3,8 @@
     python -m genomex run A.fna B.fna --outdir runs/demo
     python -m genomex run *.fna --outdir runs/all --all-pairs
     python -m genomex qc A.fna --outdir runs/qc
-    python -m genomex proteins P.faa --lineage ~/db/fungi_odb10 --outdir runs/prot
+    python -m genomex proteins P.faa --lineage fungi_odb10 --outdir runs/prot
+    python -m genomex lineages
 """
 
 from __future__ import annotations
@@ -12,7 +13,13 @@ import argparse
 import sys
 from pathlib import Path
 
-from .pipeline import DEFAULT_LINEAGE, run_pipeline, run_proteome_pipeline
+from .markers import (
+    DEFAULT_LINEAGE_NAME,
+    LINEAGE_DB_ENV,
+    available_lineages,
+    lineage_db,
+)
+from .pipeline import run_pipeline, run_proteome_pipeline
 from .proteome import NotAnAssembly, NotAProteome
 from .report import write_html_report
 from .runtime import ToolMissing
@@ -23,8 +30,13 @@ def _add_base(p: argparse.ArgumentParser, inputs_help: str) -> None:
     p.add_argument("--outdir", "-o", default="runs/latest", help="output directory")
     p.add_argument(
         "--lineage",
-        default=str(DEFAULT_LINEAGE),
-        help="BUSCO odb10 lineage directory (default: %(default)s)",
+        default=DEFAULT_LINEAGE_NAME,
+        metavar="NAME|DIR",
+        help=(
+            "BUSCO odb10 marker set, by name or by directory (default: %(default)s). "
+            "A name is looked up under $GENOMEX_DB; run `genomex lineages` to see "
+            "what is installed and what the choice costs"
+        ),
     )
     p.add_argument("--threads", type=int, default=None)
     p.add_argument("--quiet", action="store_true")
@@ -73,11 +85,53 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_base(prot, "protein FASTA files (.faa/.fa/.fasta, optionally .gz)")
 
+    sub.add_parser(
+        "lineages",
+        help="list the installed BUSCO marker sets and what choosing one costs",
+        description=(
+            "The marker set decides what a completeness number means and how much "
+            "contamination is detectable at all, and it was previously reachable "
+            "only by knowing both that --lineage existed and where the directory "
+            "lived. This lists what is installed. It does not recommend one: "
+            "picking a set means knowing the organism, and the wrong set reports "
+            "incompleteness that is not there."
+        ),
+    )
+
     return p
+
+
+def _list_lineages() -> int:
+    db = lineage_db()
+    installed = available_lineages(db)
+    if not installed:
+        print(f"no marker sets found under {db}\n")
+        print("Download one from https://busco-data.ezlab.org/v5/data/lineages/")
+        print(f"and unpack it there, or point {LINEAGE_DB_ENV} at where yours live.")
+        return 1
+
+    width = max(len(i.name) for i in installed)
+    print(f"marker sets under {db}\n")
+    for i in installed:
+        tag = "  <- default" if i.name == DEFAULT_LINEAGE_NAME else ""
+        print(f"  {i.name:<{width}}  {i.n_markers:>4} markers{tag}")
+    print(f"\nUse any of them by name:  --lineage {installed[-1].name}\n")
+    print("What the choice costs, measured (docs/benchmark-mixture.md):")
+    print("  A universal set is smaller, so a foreign genome displaces fewer of its")
+    print("  markers. On constructed mixtures at 2% donor, a lineage-specific set")
+    print("  detects 4 of 4 pairs and bacteria_odb10 detects 0 of 4. Against CheckM2")
+    print("  at >=5%, recall is 0.00 at 124 markers and 0.25 at 688.")
+    print("\n  The other direction is worse: a set from the wrong clade reports core")
+    print("  genes missing that the organism never had. GenomeX will not infer a")
+    print("  lineage from a genome, and neither should a script wrapping it.")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "lineages":
+        return _list_lineages()
+
     log = (lambda *a: None) if args.quiet else print
 
     inputs = [Path(x) for x in args.inputs]
@@ -96,6 +150,9 @@ def main(argv: list[str] | None = None) -> int:
         except NotAProteome as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 4
+        except FileNotFoundError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
         except ToolMissing as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 3
@@ -119,6 +176,9 @@ def main(argv: list[str] | None = None) -> int:
     except NotAnAssembly as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 4
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     except ToolMissing as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 3

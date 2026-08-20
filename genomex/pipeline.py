@@ -31,11 +31,52 @@ from .compare import (
 from .contamination import ContaminationResult, detect_contamination, write_contig_table
 from .fasta import Assembly, assembly_stats
 from .genes import GeneCalls, predict_genes
-from .markers import Lineage, MarkerResult, scan_markers, write_marker_table
+from .markers import (
+    DEFAULT_LINEAGE_NAME,
+    Lineage,
+    MarkerResult,
+    available_lineages,
+    lineage_db,
+    resolve_lineage,
+    scan_markers,
+    write_marker_table,
+)
 from .proteome import NOT_MEASURED, Proteome, assert_nucleotide
 from .runtime import Runtime
 
-DEFAULT_LINEAGE = Path.home() / "genomex-work" / "db" / "bacteria_odb10"
+DEFAULT_LINEAGE = lineage_db() / DEFAULT_LINEAGE_NAME
+
+
+def lineage_notice(lineage: Lineage) -> list[str]:
+    """The scan header, plus what the default set costs when it is the one in use.
+
+    The default is universal by construction, which is why it is the default and
+    also why it is the weakest instrument in the box: contamination recall is a
+    function of how many single-copy markers a foreign genome can displace. This
+    is said at run time rather than only in the docs because a user who never
+    learns `--lineage` exists still gets a verdict, and it looks the same as a
+    good one.
+
+    It states the cost; it does not act on it. Choosing a set means knowing the
+    organism, and a set chosen wrongly reports fake incompleteness.
+    """
+    lines = [f"lineage: {lineage.name} ({lineage.n_markers} markers)"]
+    if DEFAULT_LINEAGE_NAME not in (lineage.name, lineage.path.name):
+        return lines
+
+    others = [i for i in available_lineages() if i.path != lineage.path]
+    lines.append(
+        "    universal set -- detection scales with it: on constructed 2% mixtures a"
+    )
+    lines.append(
+        "    lineage-specific set finds 4 of 4 donor pairs and this one finds 0 of 4."
+    )
+    lines.append(
+        f"    {len(others)} other set(s) installed; run `genomex lineages`."
+        if others else
+        "    no other sets installed; run `genomex lineages` for where to get them."
+    )
+    return lines
 
 
 @dataclass
@@ -385,8 +426,9 @@ def run_proteome_pipeline(
         rt.threads = threads
     rt.require("hmmsearch")
 
-    lineage = Lineage.load(lineage_path)
-    log(f"lineage: {lineage.name} ({lineage.n_markers} markers)")
+    lineage = Lineage.load(resolve_lineage(lineage_path))
+    for line in lineage_notice(lineage):
+        log(line)
 
     results: list[ProteomeResult] = []
     for path in inputs:
@@ -433,8 +475,9 @@ def run_pipeline(
         rt.threads = threads
     rt.require("prodigal", "hmmsearch")
 
-    lineage = Lineage.load(lineage_path)
-    log(f"lineage: {lineage.name} ({lineage.n_markers} markers)")
+    lineage = Lineage.load(resolve_lineage(lineage_path))
+    for line in lineage_notice(lineage):
+        log(line)
 
     results: list[GenomeResult] = []
     for path in inputs:
