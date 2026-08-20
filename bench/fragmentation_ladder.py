@@ -168,9 +168,14 @@ def main() -> int:
                 if res.verdict != "clean":
                     total_false += 1
                     branch_hits += carries > 0
+                # An abstention reports no quantities at all, so the TSV must not
+                # print 0 there either -- a false-positive rate summed over a
+                # column that mixes zeros with refusals is not a rate.
+                n_suspect = res.n_suspect_contigs if res.assessed else "NA"
+                frac = round(100 * res.suspect_fraction, 2) if res.assessed else "NA"
                 rows.append(
-                    f"{asm.name}\t{seed}\t{n}\t{scored}\t{res.verdict}\t{res.n_suspect_contigs}\t"
-                    f"{round(100 * res.suspect_fraction, 2)}\t{replicons}\t"
+                    f"{asm.name}\t{seed}\t{n}\t{scored}\t{res.verdict}\t{n_suspect}\t"
+                    f"{frac}\t{replicons}\t"
                     f"{res.params.get('flagged_groups', 0)}\t{carries}\t"
                     f"{res.bins.get('bimodal')}\t{mean_kb:.1f}"
                 )

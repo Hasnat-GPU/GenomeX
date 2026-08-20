@@ -43,6 +43,29 @@ All notable changes to this project are documented here. Format follows
 
 ### Fixed
 
+- **An `undetermined` contamination verdict no longer serialises as a clean
+  result.** `ContaminationResult.summary()` reported `suspect_contigs: 0`,
+  `suspect_bp: 0`, `suspect_fraction_percent: 0.0` and empty
+  `replicon_candidates` / `atypical_host_regions` / `marker_conflict_contigs`
+  lists on the abstention path. Zero is a *measurement* — it is the answer a
+  clean genome earns — so a machine consumer reading the fraction without first
+  checking `verdict` got 0.0% contamination out of a refusal to measure, and a
+  human read the empty lists as "we looked and found none".
+
+  Every quantitative field is now `null`, the lists included, and the report
+  heads that block "Why contamination was not assessed" rather than
+  "Contamination evidence". `ContaminationResult` gained an `assessed` property
+  so the distinction has one definition instead of three.
+  `suspect_contig_names()` deliberately still returns an empty set: callers use
+  it to *exclude* genes, and nothing can be excluded on the strength of a check
+  that did not run.
+
+  **This changes the JSON schema** — three integer/float fields and three array
+  fields are now nullable. It fires on finished single-replicon assemblies, which
+  have fewer than three contigs above `--min-contig-length`; none of the 72
+  benchmark genomes and none of the four demo genomes reach it, so no benchmark
+  page, ladder TSV or committed report changes. That is also why it survived.
+
 - **A marker hit with no known contig is now recorded as unknown, not guessed.**
   `parse_domtbl` fell back to `protein_id.rsplit("_", 1)[0]`, which is Prodigal's
   `<contig>_<n>` convention. On NCBI identifiers it invented contigs — 754 of 777

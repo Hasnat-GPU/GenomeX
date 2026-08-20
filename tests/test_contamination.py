@@ -6,6 +6,8 @@ deliberately: it is where GC-only screening fails and TNF has to carry the call,
 and it is the honest measure of what this module can do.
 """
 
+import json
+
 import numpy as np
 import pytest
 
@@ -238,7 +240,48 @@ def test_too_few_contigs_returns_undetermined_not_a_guess(tmp_path):
     p = write_fasta(tmp_path / "tiny.fa", [("c1", "ACGT" * 2000), ("c2", "ACGT" * 2000)])
     result = detect_contamination(Assembly.load(p))
     assert result.verdict == "undetermined"
-    assert result.n_suspect_contigs == 0
+    assert result.assessed is False
+    # Not 0. This assertion used to read `== 0`, which is the bug written down
+    # as a test: zero suspect contigs is what a clean genome measures.
+    assert result.n_suspect_contigs is None
+    assert result.suspect_bp is None
+    assert result.suspect_fraction is None
+
+
+def test_an_abstention_serialises_as_null_and_never_as_a_clean_result(tmp_path):
+    """The failure this pins: a machine consumer reads `suspect_fraction_percent`
+    without first checking `verdict`, and a refusal to measure comes back as
+    0.0% contamination -- a better result than most real genomes get.
+
+    Every quantitative field goes to `null`, the lists included. An empty
+    `replicon_candidates` says "we looked and found none"; on this path nothing
+    was looked at."""
+    p = write_fasta(tmp_path / "tiny.fa", [("c1", "ACGT" * 2000), ("c2", "ACGT" * 2000)])
+    s = detect_contamination(Assembly.load(p)).summary()
+
+    assert s["verdict"] == "undetermined"
+    for field_name in ("suspect_contigs", "suspect_bp", "suspect_fraction_percent",
+                       "replicon_candidates", "atypical_host_regions",
+                       "marker_conflict_contigs"):
+        assert s[field_name] is None, f"{field_name} = {s[field_name]!r}, should be null"
+
+    # The refusal still ships its reason -- an abstention with no evidence
+    # attached would trade one silent failure for another.
+    assert s["reasons"] and "more sequence" in s["reasons"][0]
+    assert json.loads(json.dumps(s))["suspect_fraction_percent"] is None
+
+
+def test_a_clean_genome_still_reports_measured_zeros(tmp_path):
+    """The other half: `null` must mean unmeasured, so a genome that really was
+    scored and really has nothing foreign has to keep reporting 0 and `[]`. If
+    both cases returned null the distinction would be worthless."""
+    genome = clean_genome(n_contigs=10, seed=11)
+    s = detect_contamination(_load(tmp_path, genome)).summary()
+
+    assert s["verdict"] == "clean"
+    assert s["suspect_contigs"] == 0
+    assert s["suspect_fraction_percent"] == 0.0
+    assert s["replicon_candidates"] == []
 
 
 def test_short_contigs_are_reported_as_skipped(tmp_path):

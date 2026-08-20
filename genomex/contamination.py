@@ -171,18 +171,49 @@ class ContigVerdict:
         return bool(self.flags)
 
 
+#: The verdicts that mean sequence was actually scored.  Anything else is an
+#: abstention, and every quantity below it is unmeasured rather than zero.
+ASSESSED_VERDICTS = frozenset({"clean", "possible", "likely"})
+
+
 @dataclass
 class ContaminationResult:
-    verdict: str                      # clean | possible | likely
+    verdict: str                      # clean | possible | likely | undetermined
     reasons: list[str]
-    suspect_bp: int
-    suspect_fraction: float
-    n_suspect_contigs: int
+    # `None`, never 0, when the verdict is an abstention.  Zero is a measurement
+    # -- "we scored every contig and none was foreign" -- and it is the answer a
+    # clean genome gets.  Emitting it for a run that scored nothing hands a
+    # machine consumer a clean pass out of a refusal.
+    suspect_bp: int | None
+    suspect_fraction: float | None
+    n_suspect_contigs: int | None
     contigs: list[ContigVerdict]
     bins: dict
     params: dict
 
+    @property
+    def assessed(self) -> bool:
+        """Whether composition was actually scored, as opposed to declined."""
+        return self.verdict in ASSESSED_VERDICTS
+
     def summary(self) -> dict:
+        # Same rule for the lists as for the counts: an empty list reads as "we
+        # looked and found none", which is a different claim from "we did not
+        # look".  On an abstention there are no contig verdicts to filter, so
+        # every one of these would come out `[]` and say the wrong thing.
+        if not self.assessed:
+            return {
+                "verdict": self.verdict,
+                "reasons": self.reasons,
+                "suspect_contigs": None,
+                "suspect_bp": None,
+                "suspect_fraction_percent": None,
+                "replicon_candidates": None,
+                "atypical_host_regions": None,
+                "marker_conflict_contigs": None,
+                "bins": self.bins,
+                "params": self.params,
+            }
         return {
             "verdict": self.verdict,
             "reasons": self.reasons,
@@ -209,7 +240,12 @@ class ContaminationResult:
 
         Excludes plasmid/chromid candidates and atypical host regions alike:
         the genes on both are this organism's real biology, and the comparative
-        step writes off everything named here as an artefact."""
+        step writes off everything named here as an artefact.
+
+        Returns an empty set on an abstention, and that is deliberate: callers
+        use this to *exclude* genes, and nothing can be excluded on the strength
+        of a check that did not run.  Read `assessed` if you need to know which
+        of the two an empty set means -- `quality_call` already does."""
         return {c.name for c in self.contigs if c.call == "contaminant_candidate"}
 
     def flagged_contig_names(self) -> set[str]:
@@ -276,9 +312,9 @@ def detect_contamination(
                 f"only {len(scored)} contigs of at least {min_contig_length} bp -- "
                 "composition-based detection needs more sequence to establish a baseline"
             ],
-            suspect_bp=0,
-            suspect_fraction=0.0,
-            n_suspect_contigs=0,
+            suspect_bp=None,
+            suspect_fraction=None,
+            n_suspect_contigs=None,
             contigs=[],
             bins={},
             params={"min_contig_length": min_contig_length},

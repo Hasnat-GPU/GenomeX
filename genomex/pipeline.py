@@ -84,7 +84,7 @@ class GenomeResult:
         # reason "single-organism composition" -- a positive claim about a
         # measurement that never ran. None of the 72 benchmark genomes reach it,
         # which is exactly why it survived.
-        assessed = c.verdict in ("clean", "possible", "likely")
+        assessed = c.assessed
         if c.verdict == "likely":
             reasons.append("composition indicates more than one organism")
         elif c.verdict == "possible":

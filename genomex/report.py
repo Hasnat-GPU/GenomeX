@@ -168,7 +168,11 @@ def render_html(data: dict) -> str:
         parts.append(f'<div class="note"><code>{_esc(m["busco_style_string"])}</code></div>')
         parts.append(_marker_bar(m))
         reasons = "".join(f"<li>{_esc(r)}</li>" for r in c["reasons"])
-        parts.append(f'<h3>Contamination evidence</h3><ul class="reasons">{reasons}</ul>')
+        # "Contamination evidence" over an abstention's reason list reads as
+        # evidence of cleanliness. It is the reason the check was declined.
+        heading = ("Contamination evidence" if c["suspect_contigs"] is not None
+                   else "Why contamination was not assessed")
+        parts.append(f'<h3>{heading}</h3><ul class="reasons">{reasons}</ul>')
         b = c.get("bins", {})
         if b.get("bin0") and b.get("bin1"):
             parts.append(

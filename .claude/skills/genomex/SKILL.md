@@ -105,6 +105,13 @@ makes and you must preserve when reporting:
 - `undetermined` — too little sequence to build a within-genome null. Report
   per-contig composition instead of a verdict.
 
+**`null` and `0` mean different things, and the difference is the whole point.**
+On an `undetermined` verdict every quantity in the contamination block is `null`
+— `suspect_contigs`, `suspect_bp`, `suspect_fraction_percent`, and the three
+candidate lists. `0` and `[]` are what a genome that *was* scored and came back
+clean reports. Never read a number out of that block without reading `verdict`
+first, and never describe a `null` fraction as 0% contamination.
+
 **The verdict is not a contamination percentage and must never be reported as
 one.** It locates compositionally distinct sequence. Against CheckM2 over 72
 published assemblies it flags 9, and with the default `bacteria_odb10` it calls
