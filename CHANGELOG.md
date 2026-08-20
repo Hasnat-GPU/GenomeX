@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.0] - 2026-08-20
+
 ### Added
 
 - **`bench/mixture_ladder.py` — constructed ground truth for contamination
@@ -148,6 +152,7 @@ First working version: assemblies in, an evidence-linked report out.
   the symbiosis megaplasmids of *P. phenoliruptrix*, *P. phymatum* and
   *C. taiwanensis*.
 
-[Unreleased]: https://github.com/Hasnat-GPU/GenomeX/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Hasnat-GPU/GenomeX/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Hasnat-GPU/GenomeX/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Hasnat-GPU/GenomeX/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Hasnat-GPU/GenomeX/releases/tag/v0.1.0

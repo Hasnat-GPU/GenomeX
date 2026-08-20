@@ -10,11 +10,15 @@ abstract: >-
   GenomeX runs Prodigal, HMMER against BUSCO OrthoDB v10 profiles, MMseqs2 and
   fastANI in a single pass over bacterial assemblies, and joins their outputs
   into one report. It scores assembly completeness, detects cross-contamination
-  from tetranucleotide composition, GC, displaced single-copy markers and
-  compositional bimodality, distinguishes plasmids and secondary chromosomes
-  from contaminants, and partitions strain-unique genes between contamination
-  artefact, genomic-island acquisition and divergence — testing island
-  clustering against a permutation null before calling it acquisition.
+  from tetranucleotide composition, GC and displaced single-copy markers,
+  distinguishes plasmids and secondary chromosomes from contaminants, and
+  partitions strain-unique genes between contamination artefact, genomic-island
+  acquisition and divergence. Every judgement is stated against a null:
+  composition is scored against windows of the contig's own length drawn from
+  the assembly itself, island clustering against a permutation null, and
+  marker-duplication thresholds as a rate over the marker set rather than a
+  count. Recall is measured against constructed mixtures at known ratios, and
+  the limits that measurement exposes are documented rather than smoothed.
 keywords:
   - bioinformatics
   - genome-assembly
@@ -24,5 +28,5 @@ keywords:
   - pangenome
   - average-nucleotide-identity
 license: MIT
-version: 0.1.1
-date-released: "2026-08-18"
+version: 0.2.0
+date-released: "2026-08-20"
