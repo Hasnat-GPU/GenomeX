@@ -41,10 +41,15 @@ one, over a whole collection rather than four genomes.
 ```bash
 micromamba create -y -n checkm2 -c conda-forge -c bioconda checkm2
 micromamba run -n checkm2 checkm2 database --download --path ~/genomex-work/db/checkm2
-micromamba run -n checkm2 checkm2 predict --threads 8     --input ~/genomex-work/data/Bacteria --extension .fna     --output-directory ~/genomex-work/checkm2_out
+micromamba run -n checkm2 checkm2 predict --threads 8 \
+    --input ~/genomex-work/data/Bacteria --extension .fna \
+    --output-directory ~/genomex-work/checkm2_out
 
 python -m genomex qc ~/genomex-work/data/Bacteria/*.fna --outdir ~/genomex-work/runs/sweep
-python bench/compare_to_checkm2.py     --genomex  ~/genomex-work/runs/sweep     --checkm2  ~/genomex-work/checkm2_out/quality_report.tsv     --out      docs/benchmark-contamination.md
+python bench/compare_to_checkm2.py \
+    --genomex  ~/genomex-work/runs/sweep \
+    --checkm2  ~/genomex-work/checkm2_out/quality_report.tsv \
+    --out      docs/benchmark-contamination.md
 ```
 
 The database download is about 2.9 GB.
@@ -57,6 +62,34 @@ estimates from different methods on different bases; they should track each
 other, and exact equality would be suspicious rather than reassuring.
 
 Results: [`docs/benchmark-contamination.md`](../docs/benchmark-contamination.md).
+
+## Marker scan against BUSCO, on a proteome
+
+```bash
+micromamba run -n busco busco -i proteome.faa -l ~/genomex-work/db/fungi_odb10 \
+    -o scer_prot --out_path ~/genomex-work/busco_fungi -m proteins --offline
+
+python bench/compare_proteome_to_busco.py \
+    --proteins ~/genomex-work/data/Fungi/GCF_000146045.2.faa \
+    --lineage  ~/genomex-work/db/fungi_odb10 \
+    --busco    ~/genomex-work/busco_fungi/scer_prot \
+    --workdir  ~/genomex-work/fungal_probe
+```
+
+`compare_to_busco.py` above compares whole GenomeX runs, so it can only reach
+lineages the pipeline runs end to end — today, bacteria. This one isolates the
+marker scan: a protein FASTA and a lineage, scored both ways and diffed marker
+by marker. That is what made it possible to validate `fungi_odb10` while GenomeX
+still has no eukaryotic gene calling at all.
+
+**758/758** on the *S. cerevisiae* S288C proteome, every marker naming the same
+protein. It was 757/758 before: the one disagreement turned out to be a BUSCO
+rule this code never had — a protein counts only under the marker it scores
+highest against — which is inert on the bacterial collection and decisive on a
+lineage full of paralogous families. See `docs/decisions.md` #15.
+
+Exits non-zero on any disagreement, so it can be used as a check rather than
+read by eye.
 
 ## Fragmentation ladder — constructed specificity
 
